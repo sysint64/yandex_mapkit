@@ -13,7 +13,7 @@ class YandexMap extends StatefulWidget {
 
   static const String viewType = 'yandex_mapkit/yandex_map';
 
-  final Function onMapCreated;
+  final Function(YandexMapController) onMapCreated;
 
   @override
   YandexMapState createState() => YandexMapState();
