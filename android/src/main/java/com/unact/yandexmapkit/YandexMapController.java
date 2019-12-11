@@ -3,6 +3,7 @@ package com.unact.yandexmapkit;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import android.view.View;
 import android.graphics.Bitmap;
@@ -10,9 +11,12 @@ import android.graphics.BitmapFactory;
 
 import com.yandex.mapkit.Animation;
 import com.yandex.mapkit.MapKitFactory;
+import com.yandex.mapkit.directions.driving.DrivingRouter;
 import com.yandex.mapkit.geometry.BoundingBox;
 import com.yandex.mapkit.geometry.Point;
 import com.yandex.mapkit.geometry.Polyline;
+import com.yandex.mapkit.layers.GeoObjectTapEvent;
+import com.yandex.mapkit.layers.GeoObjectTapListener;
 import com.yandex.mapkit.layers.ObjectEvent;
 import com.yandex.mapkit.map.CameraPosition;
 import com.yandex.mapkit.map.MapObject;
@@ -25,6 +29,7 @@ import com.yandex.mapkit.user_location.UserLocationLayer;
 import com.yandex.mapkit.user_location.UserLocationObjectListener;
 import com.yandex.mapkit.user_location.UserLocationView;
 import com.yandex.runtime.image.ImageProvider;
+import com.yandex.mapkit.directions.DirectionsFactory;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -41,6 +46,7 @@ import io.flutter.plugin.platform.PlatformView;
 public class YandexMapController implements PlatformView, MethodChannel.MethodCallHandler {
   private final MapView mapView;
   private final MethodChannel methodChannel;
+  private final DrivingRouter drivingRouter;
   private final PluginRegistry.Registrar pluginRegistrar;
   private YandexUserLocationObjectListener yandexUserLocationObjectListener;
   private YandexMapObjectTapListener yandexMapObjectTapListener;
@@ -59,6 +65,23 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     userLocationLayer =
             MapKitFactory.getInstance().createUserLocationLayer(mapView.getMapWindow());
     yandexUserLocationObjectListener = new YandexUserLocationObjectListener(registrar);
+
+    mapView.getMap().addTapListener(
+      new GeoObjectTapListener() {
+        @Override
+        public boolean onObjectTap(@NonNull GeoObjectTapEvent geoObjectTapEvent) {
+          Map<String, Object> arguments = new HashMap<>();
+          arguments.put("name", geoObjectTapEvent.getGeoObject().getName());
+          methodChannel.invokeMethod("onGeoObjectTap", arguments);
+          return true;
+        }
+      }
+    );
+
+//    mapView.getMap().
+    DirectionsFactory.initialize(context);
+    drivingRouter = DirectionsFactory.getInstance().createDrivingRouter();
+
     methodChannel = new MethodChannel(registrar.messenger(), "yandex_mapkit/yandex_map_" + id);
     methodChannel.setMethodCallHandler(this);
   }

@@ -171,6 +171,10 @@ class YandexMapController extends ChangeNotifier {
       case 'onMapObjectTap':
         _onMapObjectTap(call.arguments);
         break;
+      case 'onGeoObjectTap':
+        _onGeoObjectTap(call.arguments);
+        break;
+
       default:
         throw MissingPluginException();
     }
@@ -187,6 +191,13 @@ class YandexMapController extends ChangeNotifier {
     if (placemark != null) {
       placemark.onTap(latitude, longitude);
     }
+
+    print('TAP HASH CODE: $hashCode');
+  }
+
+  void _onGeoObjectTap(dynamic arguments) {
+    final String name = arguments['name'];
+    debugPrint('NAME IS : $name');
   }
 
   Map<String, dynamic> _placemarkParams(Placemark placemark) {
