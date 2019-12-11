@@ -12,6 +12,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
 import com.yandex.mapkit.Animation;
+import com.yandex.mapkit.GeoObject;
 import com.yandex.mapkit.MapKitFactory;
 import com.yandex.mapkit.RequestPoint;
 import com.yandex.mapkit.RequestPointType;
@@ -89,7 +90,19 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         @Override
         public boolean onObjectTap(@NonNull GeoObjectTapEvent geoObjectTapEvent) {
           Map<String, Object> arguments = new HashMap<>();
-          arguments.put("name", geoObjectTapEvent.getGeoObject().getName());
+
+          final GeoObject geoObject = geoObjectTapEvent.getGeoObject();
+
+          arguments.put("name", geoObject.getName());
+          arguments.put("description", geoObject.getDescriptionText());
+
+          final BoundingBox boundingBox = geoObject.getBoundingBox();
+
+          arguments.put("northEastLatitude", boundingBox.getNorthEast().getLatitude());
+          arguments.put("northEastLongitude", boundingBox.getNorthEast().getLongitude());
+          arguments.put("southWestLatitude", boundingBox.getSouthWest().getLatitude());
+          arguments.put("southWestLongitude", boundingBox.getSouthWest().getLongitude());
+
           methodChannel.invokeMethod("onGeoObjectTap", arguments);
           return true;
         }
