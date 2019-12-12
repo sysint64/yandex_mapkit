@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:yandex_mapkit/src/geo_object.dart';
 
 import 'yandex_map_controller.dart';
 
@@ -8,12 +9,14 @@ class YandexMap extends StatefulWidget {
   /// A `Widget` for displaying Yandex Map
   const YandexMap({
     Key key,
-    this.onMapCreated
+    this.onMapCreated,
+    this.onGeoObjectTap,
   }) : super(key: key);
 
   static const String viewType = 'yandex_mapkit/yandex_map';
 
   final Function(YandexMapController) onMapCreated;
+  final Function(GeoObject) onGeoObjectTap;
 
   @override
   YandexMapState createState() => YandexMapState();
@@ -44,7 +47,7 @@ class YandexMapState extends State<YandexMap> {
   }
 
   void _onPlatformViewCreated(int id) {
-    _controller = YandexMapController.init(id);
+    _controller = YandexMapController.init(id, widget.onGeoObjectTap);
     widget?.onMapCreated(_controller);
   }
 }

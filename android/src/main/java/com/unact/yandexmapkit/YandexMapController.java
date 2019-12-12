@@ -3,6 +3,7 @@ package com.unact.yandexmapkit;
 import android.Manifest;
 import android.content.Context;
 import android.content.pm.PackageManager;
+
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
@@ -31,6 +32,7 @@ import com.yandex.mapkit.map.PlacemarkMapObject;
 import com.yandex.mapkit.map.PolylineMapObject;
 import com.yandex.mapkit.mapview.MapView;
 import com.yandex.mapkit.transport.TransportFactory;
+import com.yandex.mapkit.transport.masstransit.Line;
 import com.yandex.mapkit.transport.masstransit.MasstransitOptions;
 import com.yandex.mapkit.transport.masstransit.MasstransitRouter;
 import com.yandex.mapkit.transport.masstransit.Route;
@@ -70,6 +72,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private String userLocationIconName;
   private MasstransitRouter router;
   private final List<PolylineMapObject> routePolylines = new ArrayList<>();
+  private GeoObjectTapListener geoObjectTapListener;
 
   public YandexMapController(int id, Context context, PluginRegistry.Registrar registrar) {
     MapKitFactory.initialize(context);
@@ -83,32 +86,6 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     userLocationLayer = MapKitFactory.getInstance().createUserLocationLayer(mapView.getMapWindow());
     yandexUserLocationObjectListener = new YandexUserLocationObjectListener(registrar);
 
-//    mapObjects = mapView.getMap().getMapObjects().addCollection();
-
-    mapView.getMap().addTapListener(
-      new GeoObjectTapListener() {
-        @Override
-        public boolean onObjectTap(@NonNull GeoObjectTapEvent geoObjectTapEvent) {
-          Map<String, Object> arguments = new HashMap<>();
-
-          final GeoObject geoObject = geoObjectTapEvent.getGeoObject();
-
-          arguments.put("name", geoObject.getName());
-          arguments.put("description", geoObject.getDescriptionText());
-
-          final BoundingBox boundingBox = geoObject.getBoundingBox();
-
-          arguments.put("northEastLatitude", boundingBox.getNorthEast().getLatitude());
-          arguments.put("northEastLongitude", boundingBox.getNorthEast().getLongitude());
-          arguments.put("southWestLatitude", boundingBox.getSouthWest().getLatitude());
-          arguments.put("southWestLongitude", boundingBox.getSouthWest().getLongitude());
-
-          methodChannel.invokeMethod("onGeoObjectTap", arguments);
-          return true;
-        }
-      }
-    );
-
 //    mapView.getMap().
     methodChannel = new MethodChannel(registrar.messenger(), "yandex_mapkit/yandex_map_" + id);
     methodChannel.setMethodCallHandler(this);
@@ -118,12 +95,51 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public View getView() {
+    if (geoObjectTapListener != null) {
+      mapView.getMap().removeTapListener(geoObjectTapListener);
+    }
+
+    geoObjectTapListener = new GeoObjectTapListener() {
+      @Override
+      public boolean onObjectTap(@NonNull GeoObjectTapEvent geoObjectTapEvent) {
+        Log.d("DONE", "START");
+        Map<String, Object> arguments = new HashMap<>();
+
+        final GeoObject geoObject = geoObjectTapEvent.getGeoObject();
+
+        arguments.put("name", geoObject.getName());
+        arguments.put("description", geoObject.getDescriptionText());
+
+        if (!geoObject.getGeometry().isEmpty()) {
+          final Point point = geoObject.getGeometry().get(0).getPoint();
+
+          if (point != null) {
+            arguments.put("latitude", point.getLatitude());
+            arguments.put("longitude", point.getLongitude());
+          } else {
+            arguments.put("latitude", 0.0);
+            arguments.put("longitude", 0.0);
+          }
+        } else {
+          arguments.put("latitude", 0.0);
+          arguments.put("longitude", 0.0);
+        }
+
+        Log.d("DONE", "DONE");
+        methodChannel.invokeMethod("onGeoObjectTap", arguments);
+        Log.d("DONE", "INVOKED");
+        return true;
+      }
+    };
+
+    mapView.getMap().addTapListener(geoObjectTapListener);
     return mapView;
   }
 
   @Override
   public void dispose() {
-    mapView.onStop();
+    mapV
+  iew.onStop();
     MapKitFactory.getInstance().onStop();
   }
 
@@ -156,10 +172,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     Map<String, Object> params = ((Map<String, Object>) call.arguments);
     Point point = new Point(((Double) params.get("latitude")), ((Double) params.get("longitude")));
     CameraPosition cameraPosition = new CameraPosition(
-        point,
-        ((Double) params.get("zoom")).floatValue(),
-        ((Double) params.get("azimuth")).floatValue(),
-        ((Double) params.get("tilt")).floatValue()
+      point,
+      ((Double) params.get("zoom")).floatValue(),
+      ((Double) params.get("azimuth")).floatValue(),
+      ((Double) params.get("tilt")).floatValue()
     );
 
     moveWithParams(params, cameraPosition);
@@ -169,8 +185,8 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private void setBounds(MethodCall call) {
     Map<String, Object> params = ((Map<String, Object>) call.arguments);
     BoundingBox boundingBox = new BoundingBox(
-        new Point(((Double) params.get("southWestLatitude")), ((Double) params.get("southWestLongitude"))),
-        new Point(((Double) params.get("northEastLatitude")), ((Double) params.get("northEastLongitude")))
+      new Point(((Double) params.get("southWestLatitude")), ((Double) params.get("southWestLongitude"))),
+      new Point(((Double) params.get("northEastLatitude")), ((Double) params.get("northEastLongitude")))
     );
 
     moveWithParams(params, mapView.getMap().cameraPosition(boundingBox));
@@ -182,7 +198,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   }
 
   private Map<String, Object> getTargetPoint() {
-    Point point =  mapView.getMapWindow().getMap().getCameraPosition().getTarget();
+    Point point = mapView.getMapWindow().getMap().getCameraPosition().getTarget();
     Map<String, Object> arguments = new HashMap<>();
     arguments.put("hashCode", point.hashCode());
     arguments.put("latitude", point.getLatitude());
@@ -230,10 +246,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   }
 
   private void addPolyline(MethodCall cell) {
-    Map<String, Object> params = (Map<String, Object>)cell.arguments;
-    List<Map<String, Object>> coordinates = (List<Map<String, Object>>)params.get("coordinates");
+    Map<String, Object> params = (Map<String, Object>) cell.arguments;
+    List<Map<String, Object>> coordinates = (List<Map<String, Object>>) params.get("coordinates");
     ArrayList<Point> polylineCoordinates = new ArrayList<>();
-    for (Map<String, Object> c: coordinates) {
+    for (Map<String, Object> c : coordinates) {
       Point p = new Point((Double) c.get("latitude"), (Double) c.get("longitude"));
       polylineCoordinates.add(p);
     }
@@ -248,13 +264,13 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     polyline.setUserData(params.get("hashCode"));
     polyline.setOutlineColor(outlineColorLong.intValue());
-    polyline.setOutlineWidth(((Double)params.get("outlineWidth")).floatValue());
+    polyline.setOutlineWidth(((Double) params.get("outlineWidth")).floatValue());
     polyline.setStrokeColor(strokeColorLong.intValue());
-    polyline.setStrokeWidth(((Double)params.get("strokeWidth")).floatValue());
-    polyline.setGeodesic((boolean)params.get("isGeodesic"));
-    polyline.setDashLength(((Double)params.get("dashLength")).floatValue());
-    polyline.setDashOffset(((Double)params.get("dashOffset")).floatValue());
-    polyline.setGapLength(((Double)params.get("gapLength")).floatValue());
+    polyline.setStrokeWidth(((Double) params.get("strokeWidth")).floatValue());
+    polyline.setGeodesic((boolean) params.get("isGeodesic"));
+    polyline.setDashLength(((Double) params.get("dashLength")).floatValue());
+    polyline.setDashOffset(((Double) params.get("dashOffset")).floatValue());
+    polyline.setGapLength(((Double) params.get("gapLength")).floatValue());
 
     polylines.add(polyline);
   }
@@ -303,14 +319,14 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     float tilt = mapView.getMap().getCameraPosition().getTilt();
     float azimuth = mapView.getMap().getCameraPosition().getAzimuth();
     mapView.getMap().move(
-            new CameraPosition(
-                zoomPoint,
-                currentZoom+step,
-                tilt,
-                azimuth
-            ),
-            new Animation(Animation.Type.SMOOTH, 1),
-            null);
+      new CameraPosition(
+        zoomPoint,
+        currentZoom + step,
+        tilt,
+        azimuth
+      ),
+      new Animation(Animation.Type.SMOOTH, 1),
+      null);
   }
 
   private void requestRoute(MethodCall call) {
@@ -336,7 +352,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private void clearRoute() {
     final MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
 
-    for (final PolylineMapObject polyline : polylines) {
+    for (final PolylineMapObject polyline : routePolylines) {
       mapObjects.remove(polyline);
     }
 
@@ -449,13 +465,14 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       // the start of the section to the end of the section without transfers
       // along a similar geometry
       for (Transport transport : data.getTransports()) {
+        final Line.Style style = transport.getLine().getStyle();
         // Some public transport lines may have a color associated with them
         // Typically this is the case of underground lines
-        if (transport.getLine().getStyle() != null) {
+        if (style != null && style.getColor() != null) {
           polylineMapObject.setStrokeColor(
             // The color is in RRGGBB 24-bit format
             // Convert it to AARRGGBB 32-bit format, set alpha to 255 (opaque)
-            transport.getLine().getStyle().getColor() | 0xFF000000
+            style.getColor() | 0xFF000000
           );
           return;
         }
@@ -467,7 +484,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       knownVehicleTypes.add("tramway");
       for (Transport transport : data.getTransports()) {
         String sectionVehicleType = getVehicleType(transport, knownVehicleTypes);
-        if (sectionVehicleType.equals("bus")) {
+        if (sectionVehicleType == null) {
+          return;
+        } else if (sectionVehicleType.equals("bus")) {
           polylineMapObject.setStrokeColor(0xFF00FF00);  // Green
           return;
         } else if (sectionVehicleType.equals("tramway")) {
@@ -510,16 +529,18 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     public void onObjectAdded(UserLocationView view) {
       view.getPin().setIcon(
-          ImageProvider.fromAsset(
-              pluginRegistrar.activity(),
-              pluginRegistrar.lookupKeyForAsset(userLocationIconName)
-          )
+        ImageProvider.fromAsset(
+          pluginRegistrar.activity(),
+          pluginRegistrar.lookupKeyForAsset(userLocationIconName)
+        )
       );
     }
 
-    public void onObjectRemoved(UserLocationView view) {}
+    public void onObjectRemoved(UserLocationView view) {
+    }
 
-    public void onObjectUpdated(UserLocationView view, ObjectEvent event) {}
+    public void onObjectUpdated(UserLocationView view, ObjectEvent event) {
+    }
   }
 
   private class YandexMapObjectTapListener implements MapObjectTapListener {

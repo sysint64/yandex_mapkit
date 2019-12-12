@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:yandex_mapkit/src/geo_object.dart';
 
 import 'map_animation.dart';
 import 'placemark.dart';
@@ -11,7 +12,10 @@ import 'point.dart';
 import 'polyline.dart';
 
 class YandexMapController extends ChangeNotifier {
-  YandexMapController._(MethodChannel channel) : _channel = channel {
+  YandexMapController._(
+    MethodChannel channel,
+    this.onGeoObjectTap,
+  ) : _channel = channel {
     _channel.setMethodCallHandler(_handleMethodCall);
   }
 
@@ -23,12 +27,16 @@ class YandexMapController extends ChangeNotifier {
 
   final List<Placemark> placemarks = <Placemark>[];
   final List<Polyline> polylines = <Polyline>[];
+  Function(GeoObject) onGeoObjectTap;
 
-  static YandexMapController init(int id) {
+  static YandexMapController init(
+    int id,
+    Function(GeoObject) onGeoObjectTap,
+  ) {
     final MethodChannel methodChannel =
         MethodChannel('yandex_mapkit/yandex_map_$id');
 
-    return YandexMapController._(methodChannel);
+    return YandexMapController._(methodChannel, onGeoObjectTap);
   }
 
   /// Shows an icon at current user location
@@ -189,7 +197,22 @@ class YandexMapController extends ChangeNotifier {
 
   void _onGeoObjectTap(dynamic arguments) {
     final String name = arguments['name'];
-    debugPrint('NAME IS : $name');
+    final String description = arguments['description'];
+    final double latitude = arguments['latitude'];
+    final double longitude = arguments['longitude'];
+
+    final GeoObject geoObject = GeoObject(
+      name: name,
+      description: description,
+      point: Point(
+        latitude: latitude,
+        longitude: longitude,
+      ),
+    );
+
+    if (onGeoObjectTap != null) {
+      onGeoObjectTap(geoObject);
+    }
   }
 
   Map<String, dynamic> _placemarkParams(Placemark placemark) {
