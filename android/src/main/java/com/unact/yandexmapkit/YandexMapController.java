@@ -138,8 +138,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public void dispose() {
-    mapV
-  iew.onStop();
+    mapView.onStop();
     MapKitFactory.getInstance().onStop();
   }
 
