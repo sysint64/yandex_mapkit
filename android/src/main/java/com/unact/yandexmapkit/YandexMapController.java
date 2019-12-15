@@ -73,6 +73,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private MasstransitRouter router;
   private final List<PolylineMapObject> routePolylines = new ArrayList<>();
   private GeoObjectTapListener geoObjectTapListener;
+  private MethodChannel.Result buildRouteChannel;
 
   public YandexMapController(int id, Context context, PluginRegistry.Registrar registrar) {
     MapKitFactory.initialize(context);
@@ -410,8 +411,8 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         result.success(point);
         break;
       case "requestRoute":
+        buildRouteChannel = result;
         requestRoute(call);
-        result.success(null);
         break;
       case "clearRoute":
         clearRoute();
@@ -434,11 +435,18 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
             routes.get(0).getGeometry(), section.getGeometry()));
       }
     }
+
+    if (buildRouteChannel != null) {
+      buildRouteChannel.success(null);
+    }
   }
 
   @Override
   public void onMasstransitRoutesError(@NonNull Error error) {
     Log.e("MasstransitRoutesError", "Error" + error);
+    if (buildRouteChannel != null) {
+      buildRouteChannel.error("MasstransitRoutesError", error.toString(), error);
+    }
   }
 
 
