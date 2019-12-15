@@ -562,4 +562,12 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       return true;
     }
   }
+
+  @Override
+  public void onInputConnectionLocked() {
+  }
+
+  @Override
+  public void onInputConnectionUnlocked() {
+  }
 }
