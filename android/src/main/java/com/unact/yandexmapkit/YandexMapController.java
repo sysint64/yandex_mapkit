@@ -414,7 +414,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         buildRouteChannel = result;
         requestRoute(call);
         break;
-      case "clearRoute":
+      case "clearRoutes":
         clearRoute();
         result.success(null);
         break;

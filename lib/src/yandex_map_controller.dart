@@ -84,6 +84,10 @@ class YandexMapController extends ChangeNotifier {
     });
   }
 
+  Future<void> clearRoutes() async {
+    await _channel.invokeMethod<void>('clearRoutes');
+  }
+
   Future<void> move(
       {@required Point point,
       double zoom = kZoom,
