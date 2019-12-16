@@ -12,11 +12,7 @@ import android.view.View;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
-import com.yandex.mapkit.Animation;
-import com.yandex.mapkit.GeoObject;
-import com.yandex.mapkit.MapKitFactory;
-import com.yandex.mapkit.RequestPoint;
-import com.yandex.mapkit.RequestPointType;
+import com.yandex.mapkit.*;
 import com.yandex.mapkit.geometry.BoundingBox;
 import com.yandex.mapkit.geometry.Point;
 import com.yandex.mapkit.geometry.Polyline;
@@ -24,13 +20,10 @@ import com.yandex.mapkit.geometry.SubpolylineHelper;
 import com.yandex.mapkit.layers.GeoObjectTapEvent;
 import com.yandex.mapkit.layers.GeoObjectTapListener;
 import com.yandex.mapkit.layers.ObjectEvent;
-import com.yandex.mapkit.map.CameraPosition;
-import com.yandex.mapkit.map.MapObject;
-import com.yandex.mapkit.map.MapObjectCollection;
-import com.yandex.mapkit.map.MapObjectTapListener;
-import com.yandex.mapkit.map.PlacemarkMapObject;
-import com.yandex.mapkit.map.PolylineMapObject;
+import com.yandex.mapkit.map.*;
 import com.yandex.mapkit.mapview.MapView;
+import com.yandex.mapkit.search.*;
+import com.yandex.mapkit.search.Session.SearchListener;
 import com.yandex.mapkit.transport.TransportFactory;
 import com.yandex.mapkit.transport.masstransit.Line;
 import com.yandex.mapkit.transport.masstransit.MasstransitOptions;
@@ -38,9 +31,9 @@ import com.yandex.mapkit.transport.masstransit.MasstransitRouter;
 import com.yandex.mapkit.transport.masstransit.Route;
 import com.yandex.mapkit.transport.masstransit.Section;
 import com.yandex.mapkit.transport.masstransit.SectionMetadata;
-import com.yandex.mapkit.transport.masstransit.Session;
 import com.yandex.mapkit.transport.masstransit.TimeOptions;
 import com.yandex.mapkit.transport.masstransit.Transport;
+import com.yandex.mapkit.transport.masstransit.Session.RouteListener;
 import com.yandex.mapkit.user_location.UserLocationLayer;
 import com.yandex.mapkit.user_location.UserLocationObjectListener;
 import com.yandex.mapkit.user_location.UserLocationView;
@@ -59,8 +52,8 @@ import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.platform.PlatformView;
 
-
-public class YandexMapController implements PlatformView, MethodChannel.MethodCallHandler, Session.RouteListener {
+public class YandexMapController implements PlatformView, MethodChannel.MethodCallHandler,
+  RouteListener, SearchListener {
   private final MapView mapView;
   private final MethodChannel methodChannel;
   private final PluginRegistry.Registrar pluginRegistrar;
@@ -73,7 +66,12 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private MasstransitRouter router;
   private final List<PolylineMapObject> routePolylines = new ArrayList<>();
   private GeoObjectTapListener geoObjectTapListener;
+
   private MethodChannel.Result buildRouteChannel;
+  private MethodChannel.Result searchChannel;
+
+  private SearchManager searchManager;
+  private Session searchSession;
 
   public YandexMapController(int id, Context context, PluginRegistry.Registrar registrar) {
     MapKitFactory.initialize(context);
@@ -92,6 +90,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     methodChannel.setMethodCallHandler(this);
 
     router = TransportFactory.getInstance().createMasstransitRouter();
+
+    // Search
+    SearchFactory.initialize(context);
+    searchManager = SearchFactory.getInstance().createSearchManager(SearchManagerType.COMBINED);
   }
 
   @Override
@@ -349,6 +351,20 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     router.requestRoutes(points, options, this);
   }
 
+  private void search(MethodCall call) {
+    final Map<String, Object> params = ((Map<String, Object>) call.arguments);
+    final String query = (String) params.get("query");
+
+    if (query != null) {
+      searchSession = searchManager.submit(
+        query,
+        VisibleRegionUtils.toPolygon(mapView.getMap().getVisibleRegion()),
+        new SearchOptions(),
+        this
+      );
+    }
+  }
+
   private void clearRoute() {
     final MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
 
@@ -418,6 +434,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         clearRoute();
         result.success(null);
         break;
+      case "search":
+        searchChannel = result;
+        search(call);
+        break;
       default:
         result.notImplemented();
         break;
@@ -448,7 +468,6 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       buildRouteChannel.error("MasstransitRoutesError", error.toString(), error);
     }
   }
-
 
   private void drawSection(SectionMetadata.SectionData data,
                            Polyline geometry) {
@@ -525,6 +544,32 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       }
     }
     return null;
+  }
+
+  @Override
+  public void onSearchResponse(@NonNull Response response) {
+    final List<Map<String, Object>> results = new ArrayList<>();
+
+    for (GeoObjectCollection.Item searchResult : response.getCollection().getChildren()) {
+      final Map<String, Object> arguments = new HashMap<>();
+
+      arguments.put("name", searchResult.getObj().getName());
+      arguments.put("description", searchResult.getObj().getDescriptionText());
+
+      results.add(arguments);
+    }
+
+    if (searchChannel != null) {
+      searchChannel.success(results);
+    }
+  }
+
+  @Override
+  public void onSearchError(@NonNull Error error) {
+    Log.e("SearchError", "Error" + error);
+    if (searchChannel != null) {
+      searchChannel.error("SearchError", error.toString(), error);
+    }
   }
 
   private class YandexUserLocationObjectListener implements UserLocationObjectListener {

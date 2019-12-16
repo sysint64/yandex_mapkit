@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:yandex_mapkit/src/geo_object.dart';
+import 'package:yandex_mapkit/src/search_suggestion.dart';
 
 import 'map_animation.dart';
 import 'placemark.dart';
@@ -167,6 +168,27 @@ class YandexMapController extends ChangeNotifier {
     final dynamic point =
         await _channel.invokeMethod<dynamic>('getTargetPoint');
     return Point(latitude: point['latitude'], longitude: point['longitude']);
+  }
+
+  Future<List<SearchSuggestion>> search(String key) async {
+    final List<dynamic> data = await _channel.invokeMethod<List<dynamic>>(
+      'search',
+      <String, dynamic>{'query': key},
+    );
+
+    final List<SearchSuggestion> result = <SearchSuggestion>[];
+
+    for (final dynamic item in data) {
+      result.add(
+        SearchSuggestion(
+          name: item['name'],
+          description: item['description'],
+        ),
+      );
+    }
+
+//    return data.map((dynamic it) => it as Map<String, dynamic>).toList();
+    return result;
   }
 
   Future<void> _handleMethodCall(MethodCall call) async {
