@@ -23,16 +23,12 @@ import com.yandex.mapkit.layers.ObjectEvent;
 import com.yandex.mapkit.map.*;
 import com.yandex.mapkit.mapview.MapView;
 import com.yandex.mapkit.search.*;
+import com.yandex.mapkit.search.Session;
 import com.yandex.mapkit.search.Session.SearchListener;
 import com.yandex.mapkit.transport.TransportFactory;
+import com.yandex.mapkit.transport.bicycle.BicycleRouter;
+import com.yandex.mapkit.transport.masstransit.*;
 import com.yandex.mapkit.transport.masstransit.Line;
-import com.yandex.mapkit.transport.masstransit.MasstransitOptions;
-import com.yandex.mapkit.transport.masstransit.MasstransitRouter;
-import com.yandex.mapkit.transport.masstransit.Route;
-import com.yandex.mapkit.transport.masstransit.Section;
-import com.yandex.mapkit.transport.masstransit.SectionMetadata;
-import com.yandex.mapkit.transport.masstransit.TimeOptions;
-import com.yandex.mapkit.transport.masstransit.Transport;
 import com.yandex.mapkit.transport.masstransit.Session.RouteListener;
 import com.yandex.mapkit.user_location.UserLocationLayer;
 import com.yandex.mapkit.user_location.UserLocationObjectListener;
@@ -53,7 +49,7 @@ import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.platform.PlatformView;
 
 public class YandexMapController implements PlatformView, MethodChannel.MethodCallHandler,
-  RouteListener, SearchListener {
+  RouteListener, SearchListener, com.yandex.mapkit.transport.bicycle.Session.RouteListener {
   private final MapView mapView;
   private final MethodChannel methodChannel;
   private final PluginRegistry.Registrar pluginRegistrar;
@@ -63,7 +59,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private List<PlacemarkMapObject> placemarks = new ArrayList<>();
   private List<PolylineMapObject> polylines = new ArrayList<>();
   private String userLocationIconName;
-  private MasstransitRouter router;
+  private MasstransitRouter masstransitRouter;
+  private PedestrianRouter pedestrianRouter;
+  private BicycleRouter bicycleRouter;
   private final List<PolylineMapObject> routePolylines = new ArrayList<>();
   private GeoObjectTapListener geoObjectTapListener;
 
@@ -88,7 +86,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     methodChannel = new MethodChannel(registrar.messenger(), "yandex_mapkit/yandex_map_" + id);
     methodChannel.setMethodCallHandler(this);
 
-    router = TransportFactory.getInstance().createMasstransitRouter();
+    masstransitRouter = TransportFactory.getInstance().createMasstransitRouter();
+    pedestrianRouter = TransportFactory.getInstance().createPedestrianRouter();
+    bicycleRouter = TransportFactory.getInstance().createBicycleRouter();
 
     // Search
     SearchFactory.initialize(context);
@@ -330,12 +330,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       null);
   }
 
-  private void requestRoute(MethodCall call) {
-    MasstransitOptions options = new MasstransitOptions(
-      new ArrayList<String>(),
-      new ArrayList<String>(),
-      new TimeOptions());
-
+  private List<RequestPoint> getRouterPoints(MethodCall call) {
     Map<String, Object> params = ((Map<String, Object>) call.arguments);
 
     final Double srcLatitude = (Double) params.get("srcLatitude");
@@ -346,8 +341,29 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     final List<RequestPoint> points = new ArrayList<>();
     points.add(new RequestPoint(new Point(srcLatitude, srcLongitude), RequestPointType.WAYPOINT, null));
     points.add(new RequestPoint(new Point(destLatitude, destLongitude), RequestPointType.WAYPOINT, null));
+
+    return points;
+  }
+
+  private void requestMasstransitRoute(MethodCall call) {
+    MasstransitOptions options = new MasstransitOptions(
+      new ArrayList<String>(),
+      new ArrayList<String>(),
+      new TimeOptions()
+    );
+
     clearRoute();
-    router.requestRoutes(points, options, this);
+    masstransitRouter.requestRoutes(getRouterPoints(call), options, this);
+  }
+
+  private void requestPedestrianRoute(MethodCall call) {
+    clearRoute();
+    pedestrianRouter.requestRoutes(getRouterPoints(call), new TimeOptions(), this);
+  }
+
+  private void requestBicycleRoute(MethodCall call) {
+    clearRoute();
+    bicycleRouter.requestRoutes(getRouterPoints(call), this);
   }
 
   private void search(MethodCall call) {
@@ -425,9 +441,17 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         Map<String, Object> point = getTargetPoint();
         result.success(point);
         break;
-      case "requestRoute":
+      case "requestMasstransitRoute":
         buildRouteChannel = result;
-        requestRoute(call);
+        requestMasstransitRoute(call);
+        break;
+      case "requestPedestrianRoute":
+        buildRouteChannel = result;
+        requestPedestrianRoute(call);
+        break;
+      case "requestBicycleRoute":
+        buildRouteChannel = result;
+        requestBicycleRoute(call);
         break;
       case "clearRoutes":
         clearRoute();
@@ -468,15 +492,57 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     }
   }
 
-  private void drawSection(SectionMetadata.SectionData data,
-                           Polyline geometry) {
+  @Override
+  public void onBicycleRoutes(@NonNull List<com.yandex.mapkit.transport.bicycle.Route> routes) {
+        // In this example we consider first alternative only
+    if (routes.size() > 0) {
+      for (com.yandex.mapkit.transport.bicycle.Section section : routes.get(0).getSections()) {
+        drawBicycleSection(
+          section,
+          SubpolylineHelper.subpolyline(
+            routes.get(0).getGeometry(), section.getGeometry()));
+      }
+    }
 
+    if (buildRouteChannel != null) {
+      buildRouteChannel.success(null);
+    }
+  }
+
+  @Override
+  public void onBicycleRoutesError(@NonNull Error error) {
+    Log.e("BicycleRoutesError", "Error" + error);
+    if (buildRouteChannel != null) {
+      buildRouteChannel.error("BicycleRoutesError", error.toString(), error);
+    }
+  }
+
+  private void drawBicycleSection(
+    com.yandex.mapkit.transport.bicycle.Section section,
+    Polyline geometry
+  ) {
     // Draw a section polyline on a map
     // Set its color depending on the information which the section contains
     MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
     PolylineMapObject polylineMapObject = mapObjects.addPolyline(geometry);
+    polylineMapObject.setStrokeColor(0xFF0000FF);
     routePolylines.add(polylineMapObject);
+  }
 
+  private void drawSection(
+    SectionMetadata.SectionData data,
+    Polyline geometry
+  ) {
+    // Draw a section polyline on a map
+    // Set its color depending on the information which the section contains
+    MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
+    PolylineMapObject polylineMapObject = mapObjects.addPolyline(geometry);
+    final int color = getMasstransitSectionColor(data);
+    polylineMapObject.setStrokeColor(color);
+    routePolylines.add(polylineMapObject);
+  }
+
+  private int getMasstransitSectionColor(SectionMetadata.SectionData data) {
     // Masstransit route section defines exactly one on the following
     // 1. Wait until public transport unit arrives
     // 2. Walk
@@ -495,12 +561,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         // Some public transport lines may have a color associated with them
         // Typically this is the case of underground lines
         if (style != null && style.getColor() != null) {
-          polylineMapObject.setStrokeColor(
-            // The color is in RRGGBB 24-bit format
-            // Convert it to AARRGGBB 32-bit format, set alpha to 255 (opaque)
-            style.getColor() | 0xFF000000
-          );
-          return;
+          // The color is in RRGGBB 24-bit format
+          // Convert it to AARRGGBB 32-bit format, set alpha to 255 (opaque)
+          return style.getColor() | 0xFF000000;
         }
       }
       // Let us draw bus lines in green and tramway lines in red
@@ -511,20 +574,18 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       for (Transport transport : data.getTransports()) {
         String sectionVehicleType = getVehicleType(transport, knownVehicleTypes);
         if (sectionVehicleType == null) {
-          return;
+          return 0x00000000;
         } else if (sectionVehicleType.equals("bus")) {
-          polylineMapObject.setStrokeColor(0xFF00FF00);  // Green
-          return;
+          return 0xFF00FF00;  // Green
         } else if (sectionVehicleType.equals("tramway")) {
-          polylineMapObject.setStrokeColor(0xFFFF0000);  // Red
-          return;
+          return 0xFFFF0000;  // Red
         }
       }
-      polylineMapObject.setStrokeColor(0xFF0000FF);  // Blue
+      return 0xFF0000FF;  // Blue
     } else {
       // This is not a public transport ride section
       // In this example let us draw it in black
-      polylineMapObject.setStrokeColor(0xFF000000);  // Black
+      return 0xFF000000;  // Black
     }
   }
 

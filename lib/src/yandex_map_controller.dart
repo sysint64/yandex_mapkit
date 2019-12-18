@@ -73,11 +73,35 @@ class YandexMapController extends ChangeNotifier {
         .invokeMethod<void>('setMapStyle', <String, dynamic>{'style': style});
   }
 
-  Future<void> requestRoute({
+  Future<void> requestMasstransitRoute({
     @required Point src,
     @required Point dest,
   }) async {
-    await _channel.invokeMethod<void>('requestRoute', <String, dynamic>{
+    await _channel.invokeMethod<void>('requestMasstransitRoute', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
+  Future<void> requestPedestrianRoute({
+    @required Point src,
+    @required Point dest,
+  }) async {
+    await _channel.invokeMethod<void>('requestPedestrianRoute', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
+  Future<void> requestBicycleRoute({
+    @required Point src,
+    @required Point dest,
+  }) async {
+    await _channel.invokeMethod<void>('requestBicycleRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
