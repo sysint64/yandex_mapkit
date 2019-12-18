@@ -85,7 +85,6 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     userLocationLayer = MapKitFactory.getInstance().createUserLocationLayer(mapView.getMapWindow());
     yandexUserLocationObjectListener = new YandexUserLocationObjectListener(registrar);
 
-//    mapView.getMap().
     methodChannel = new MethodChannel(registrar.messenger(), "yandex_mapkit/yandex_map_" + id);
     methodChannel.setMethodCallHandler(this);
 
@@ -471,6 +470,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   private void drawSection(SectionMetadata.SectionData data,
                            Polyline geometry) {
+
     // Draw a section polyline on a map
     // Set its color depending on the information which the section contains
     MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
@@ -552,9 +552,26 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     for (GeoObjectCollection.Item searchResult : response.getCollection().getChildren()) {
       final Map<String, Object> arguments = new HashMap<>();
+      final GeoObject obj = searchResult.getObj();
 
-      arguments.put("name", searchResult.getObj().getName());
-      arguments.put("description", searchResult.getObj().getDescriptionText());
+      if (obj == null) {
+        continue;
+      }
+
+      if (obj.getGeometry().isEmpty()) {
+        continue;
+      }
+
+      final Point point = obj.getGeometry().get(0).getPoint();
+
+      if (point == null) {
+        continue;
+      }
+
+      arguments.put("name", obj.getName());
+      arguments.put("description", obj.getDescriptionText());
+      arguments.put("latitude", point.getLatitude());
+      arguments.put("longitude", point.getLongitude());
 
       results.add(arguments);
     }

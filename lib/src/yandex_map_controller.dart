@@ -183,11 +183,12 @@ class YandexMapController extends ChangeNotifier {
         SearchSuggestion(
           name: item['name'],
           description: item['description'],
+          latitude: item['latitude'],
+          longitude: item['longitude'],
         ),
       );
     }
 
-//    return data.map((dynamic it) => it as Map<String, dynamic>).toList();
     return result;
   }
 
