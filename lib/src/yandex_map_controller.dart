@@ -109,6 +109,42 @@ class YandexMapController extends ChangeNotifier {
     });
   }
 
+  Future<String> estimateMasstransitRoute({
+    @required Point src,
+    @required Point dest,
+  }) async {
+    return _channel.invokeMethod<String>('estimateMasstransitRoute', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
+  Future<String> estimatePedestrianRoute({
+    @required Point src,
+    @required Point dest,
+  }) async {
+    return _channel.invokeMethod<String>('estimatePedestrianRoute', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
+  Future<String> estimateBicycleRoute({
+    @required Point src,
+    @required Point dest,
+  }) async {
+    return _channel.invokeMethod<String>('estimateBicycleRoute', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
   Future<void> clearRoutes() async {
     await _channel.invokeMethod<void>('clearRoutes');
   }

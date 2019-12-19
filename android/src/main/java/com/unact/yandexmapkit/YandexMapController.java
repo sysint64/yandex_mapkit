@@ -65,6 +65,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private final List<PolylineMapObject> routePolylines = new ArrayList<>();
   private GeoObjectTapListener geoObjectTapListener;
 
+  private MethodChannel.Result estimationRouteChannel;
   private MethodChannel.Result buildRouteChannel;
   private MethodChannel.Result searchChannel;
 
@@ -352,17 +353,26 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       new TimeOptions()
     );
 
-    clearRoute();
+    if (buildRouteChannel != null) {
+      clearRoute();
+    }
+
     masstransitRouter.requestRoutes(getRouterPoints(call), options, this);
   }
 
   private void requestPedestrianRoute(MethodCall call) {
-    clearRoute();
+    if (buildRouteChannel != null) {
+      clearRoute();
+    }
+
     pedestrianRouter.requestRoutes(getRouterPoints(call), new TimeOptions(), this);
   }
 
   private void requestBicycleRoute(MethodCall call) {
-    clearRoute();
+    if (buildRouteChannel != null) {
+      clearRoute();
+    }
+
     bicycleRouter.requestRoutes(getRouterPoints(call), this);
   }
 
@@ -392,6 +402,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public void onMethodCall(MethodCall call, MethodChannel.Result result) {
+    estimationRouteChannel = null;
+    buildRouteChannel = null;
+
     switch (call.method) {
       case "showUserLayer":
         showUserLayer(call);
@@ -453,6 +466,20 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         buildRouteChannel = result;
         requestBicycleRoute(call);
         break;
+
+      case "estimateMasstransitRoute":
+        estimationRouteChannel = result;
+        requestMasstransitRoute(call);
+        break;
+      case "estimatePedestrianRoute":
+        estimationRouteChannel = result;
+        requestPedestrianRoute(call);
+        break;
+      case "estimateBicycleRoute":
+        estimationRouteChannel = result;
+        requestBicycleRoute(call);
+        break;
+
       case "clearRoutes":
         clearRoute();
         result.success(null);
@@ -471,11 +498,16 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public void onMasstransitRoutes(@NonNull List<Route> routes) {
     // In this example we consider first alternative only
     if (routes.size() > 0) {
-      for (Section section : routes.get(0).getSections()) {
-        drawSection(
-          section.getMetadata().getData(),
-          SubpolylineHelper.subpolyline(
-            routes.get(0).getGeometry(), section.getGeometry()));
+      if (estimationRouteChannel != null) {
+        final String estimation = routes.get(0).getMetadata().getWeight().getTime().getText();
+        estimationRouteChannel.success(estimation);
+      } else {
+        for (Section section : routes.get(0).getSections()) {
+          drawSection(
+            section.getMetadata().getData(),
+            SubpolylineHelper.subpolyline(
+              routes.get(0).getGeometry(), section.getGeometry()));
+        }
       }
     }
 
@@ -496,11 +528,16 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public void onBicycleRoutes(@NonNull List<com.yandex.mapkit.transport.bicycle.Route> routes) {
         // In this example we consider first alternative only
     if (routes.size() > 0) {
-      for (com.yandex.mapkit.transport.bicycle.Section section : routes.get(0).getSections()) {
-        drawBicycleSection(
-          section,
-          SubpolylineHelper.subpolyline(
-            routes.get(0).getGeometry(), section.getGeometry()));
+      if (estimationRouteChannel != null) {
+        final String estimation = routes.get(0).getWeight().getTime().getText();
+        estimationRouteChannel.success(estimation);
+      } else {
+        for (com.yandex.mapkit.transport.bicycle.Section section : routes.get(0).getSections()) {
+          drawBicycleSection(
+            section,
+            SubpolylineHelper.subpolyline(
+              routes.get(0).getGeometry(), section.getGeometry()));
+        }
       }
     }
 
