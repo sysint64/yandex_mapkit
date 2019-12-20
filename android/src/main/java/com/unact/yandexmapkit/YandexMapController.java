@@ -223,6 +223,22 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     }
   }
 
+  @SuppressWarnings("unchecked")
+  private void updatePlacemarkPoint(MethodCall call) {
+    Map<String, Object> params = ((Map<String, Object>) call.arguments);
+    Point point = new Point(((Double) params.get("latitude")), ((Double) params.get("longitude")));
+
+    MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
+    Iterator<PlacemarkMapObject> iterator = placemarks.iterator();
+
+    while (iterator.hasNext()) {
+      PlacemarkMapObject placemarkMapObject = iterator.next();
+      if (placemarkMapObject.getUserData().equals(params.get("hashCode"))) {
+        placemarkMapObject.setGeometry(point);
+      }
+    }
+  }
+
   private void addPlacemarkToMap(Map<String, Object> params) {
     Point point = new Point(((Double) params.get("latitude")), ((Double) params.get("longitude")));
     MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
@@ -432,6 +448,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         break;
       case "removePlacemark":
         removePlacemark(call);
+        result.success(null);
+        break;
+      case "updatePlacemarkPoint":
+        updatePlacemarkPoint(call);
         result.success(null);
         break;
       case "addPolyline":

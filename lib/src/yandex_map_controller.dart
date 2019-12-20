@@ -199,6 +199,15 @@ class YandexMapController extends ChangeNotifier {
     }
   }
 
+  Future<void> updatePlacemarkPoint(Placemark placemark, Point point) async {
+    await _channel.invokeMethod<void>(
+        'updatePlacemarkPoint', <String, dynamic>{
+          'hashCode': placemark.hashCode,
+          'latitude': point.latitude,
+          'longitude': point.longitude,
+        });
+  }
+
   /// Does nothing if passed `Polyline` is `null`
   Future<void> addPolyline(Polyline polyline) async {
     if (polyline != null) {
