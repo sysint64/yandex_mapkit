@@ -7,12 +7,15 @@ import android.content.pm.PackageManager;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
+import android.graphics.Color;
+import android.graphics.PointF;
 import android.util.Log;
 import android.view.View;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 
 import com.yandex.mapkit.*;
+import com.yandex.mapkit.directions.DirectionsFactory;
 import com.yandex.mapkit.geometry.BoundingBox;
 import com.yandex.mapkit.geometry.Point;
 import com.yandex.mapkit.geometry.Polyline;
@@ -30,6 +33,10 @@ import com.yandex.mapkit.transport.bicycle.BicycleRouter;
 import com.yandex.mapkit.transport.masstransit.*;
 import com.yandex.mapkit.transport.masstransit.Line;
 import com.yandex.mapkit.transport.masstransit.Session.RouteListener;
+import com.yandex.mapkit.directions.driving.DrivingRouter;
+import com.yandex.mapkit.directions.driving.DrivingOptions;
+import com.yandex.mapkit.directions.driving.DrivingSession;
+import com.yandex.mapkit.directions.driving.DrivingRoute;
 import com.yandex.mapkit.user_location.UserLocationLayer;
 import com.yandex.mapkit.user_location.UserLocationObjectListener;
 import com.yandex.mapkit.user_location.UserLocationView;
@@ -49,7 +56,8 @@ import io.flutter.plugin.common.PluginRegistry;
 import io.flutter.plugin.platform.PlatformView;
 
 public class YandexMapController implements PlatformView, MethodChannel.MethodCallHandler,
-  RouteListener, SearchListener, com.yandex.mapkit.transport.bicycle.Session.RouteListener {
+  RouteListener, SearchListener, com.yandex.mapkit.transport.bicycle.Session.RouteListener,
+  DrivingSession.DrivingRouteListener {
   private final MapView mapView;
   private final MethodChannel methodChannel;
   private final PluginRegistry.Registrar pluginRegistrar;
@@ -58,10 +66,14 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private UserLocationLayer userLocationLayer;
   private List<PlacemarkMapObject> placemarks = new ArrayList<>();
   private List<PolylineMapObject> polylines = new ArrayList<>();
-  private String userLocationIconName;
+  private String userLocationArrowIconName;
+  private String userLocationPinIconName;
+
   private MasstransitRouter masstransitRouter;
   private PedestrianRouter pedestrianRouter;
   private BicycleRouter bicycleRouter;
+  private DrivingRouter drivingRouter;
+
   private final List<PolylineMapObject> routePolylines = new ArrayList<>();
   private GeoObjectTapListener geoObjectTapListener;
 
@@ -75,6 +87,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public YandexMapController(int id, Context context, PluginRegistry.Registrar registrar) {
     MapKitFactory.initialize(context);
     TransportFactory.initialize(context);
+    DirectionsFactory.initialize(context);
 
     mapView = new MapView(context);
     MapKitFactory.getInstance().onStart();
@@ -90,6 +103,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     masstransitRouter = TransportFactory.getInstance().createMasstransitRouter();
     pedestrianRouter = TransportFactory.getInstance().createPedestrianRouter();
     bicycleRouter = TransportFactory.getInstance().createBicycleRouter();
+    drivingRouter = DirectionsFactory.getInstance().createDrivingRouter();
 
     // Search
     SearchFactory.initialize(context);
@@ -150,10 +164,11 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     if (!hasLocationPermission()) return;
 
     Map<String, Object> params = ((Map<String, Object>) call.arguments);
-    userLocationIconName = (String) params.get("iconName");
+    userLocationArrowIconName = (String) params.get("arrowIconName");
+    userLocationPinIconName = (String) params.get("pinIconName");
 
     userLocationLayer.setVisible(true);
-    userLocationLayer.setHeadingEnabled(true);
+    userLocationLayer.setHeadingEnabled(false);
     userLocationLayer.setObjectListener(yandexUserLocationObjectListener);
   }
 
@@ -392,6 +407,15 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     bicycleRouter.requestRoutes(getRouterPoints(call), this);
   }
 
+  private void requestDrivingRoute(MethodCall call) {
+    if (buildRouteChannel != null) {
+      clearRoute();
+    }
+
+    final DrivingOptions options = new DrivingOptions();
+    drivingRouter.requestRoutes(getRouterPoints(call), options, this);
+  }
+
   private void search(MethodCall call) {
     final Map<String, Object> params = ((Map<String, Object>) call.arguments);
     final String query = (String) params.get("query");
@@ -486,7 +510,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         buildRouteChannel = result;
         requestBicycleRoute(call);
         break;
-
+      case "requestDrivingRoute":
+        buildRouteChannel = result;
+        requestDrivingRoute(call);
+        break;
       case "estimateMasstransitRoute":
         estimationRouteChannel = result;
         requestMasstransitRoute(call);
@@ -499,7 +526,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         estimationRouteChannel = result;
         requestBicycleRoute(call);
         break;
-
+      case "estimateDrivingRoute":
+        estimationRouteChannel = result;
+        requestDrivingRoute(call);
+        break;
       case "clearRoutes":
         clearRoute();
         result.success(null);
@@ -516,18 +546,23 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public void onMasstransitRoutes(@NonNull List<Route> routes) {
+    Log.e("MasstransitRoutes", "TEST");
     // In this example we consider first alternative only
     if (routes.size() > 0) {
       if (estimationRouteChannel != null) {
         final String estimation = routes.get(0).getMetadata().getWeight().getTime().getText();
         estimationRouteChannel.success(estimation);
+        Log.e("MasstransitRoutes", "EST");
+        return;
       } else {
+        Log.e("MasstransitRoutes", "ST SECTION");
         for (Section section : routes.get(0).getSections()) {
           drawSection(
             section.getMetadata().getData(),
             SubpolylineHelper.subpolyline(
               routes.get(0).getGeometry(), section.getGeometry()));
         }
+        Log.e("MasstransitRoutes", "ED SECTION");
       }
     }
 
@@ -546,7 +581,6 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public void onBicycleRoutes(@NonNull List<com.yandex.mapkit.transport.bicycle.Route> routes) {
-        // In this example we consider first alternative only
     if (routes.size() > 0) {
       if (estimationRouteChannel != null) {
         final String estimation = routes.get(0).getWeight().getTime().getText();
@@ -707,6 +741,35 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     }
   }
 
+  @Override
+  public void onDrivingRoutes(@NonNull List<DrivingRoute> routes) {
+    if (routes.size() > 0) {
+      if (estimationRouteChannel != null) {
+        final String estimation = routes.get(0).getMetadata().getWeight().getTime().getText();
+        estimationRouteChannel.success(estimation);
+      } else {
+        final DrivingRoute route = routes.get(0);
+
+        MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
+        PolylineMapObject polylineMapObject = mapObjects.addPolyline(route.getGeometry());
+        polylineMapObject.setStrokeColor(0xFF0000FF);
+        routePolylines.add(polylineMapObject);
+      }
+    }
+
+    if (buildRouteChannel != null) {
+      buildRouteChannel.success(null);
+    }
+  }
+
+  @Override
+  public void onDrivingRoutesError(@NonNull Error error) {
+    Log.e("DrivingRoutesError", "Error" + error);
+    if (searchChannel != null) {
+      searchChannel.error("DrivingRoutesError", error.toString(), error);
+    }
+  }
+
   private class YandexUserLocationObjectListener implements UserLocationObjectListener {
     private PluginRegistry.Registrar pluginRegistrar;
 
@@ -714,19 +777,26 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       this.pluginRegistrar = pluginRegistrar;
     }
 
-    public void onObjectAdded(UserLocationView view) {
-      view.getPin().setIcon(
-        ImageProvider.fromAsset(
-          pluginRegistrar.activity(),
-          pluginRegistrar.lookupKeyForAsset(userLocationIconName)
-        )
+    public void onObjectAdded(UserLocationView userLocationView) {
+      final ImageProvider arrowIconProvider = ImageProvider.fromAsset(
+        mapView.getContext(),
+        pluginRegistrar.lookupKeyForAsset(userLocationArrowIconName)
       );
+
+      final ImageProvider pinIconProvider = ImageProvider.fromAsset(
+        mapView.getContext(),
+        pluginRegistrar.lookupKeyForAsset(userLocationPinIconName)
+      );
+
+      userLocationView.getArrow().setIcon(arrowIconProvider);
+      userLocationView.getPin().setIcon(pinIconProvider);
     }
 
     public void onObjectRemoved(UserLocationView view) {
     }
 
     public void onObjectUpdated(UserLocationView view, ObjectEvent event) {
+      view.getArrow().getGeometry();
     }
   }
 

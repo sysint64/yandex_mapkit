@@ -49,9 +49,14 @@ class YandexMapController extends ChangeNotifier {
   /// `android.permission.ACCESS_FINE_LOCATION`
   ///
   /// Does nothing if these permissions where denied
-  Future<void> showUserLayer({@required String iconName}) async {
-    await _channel.invokeMethod<void>(
-        'showUserLayer', <String, dynamic>{'iconName': iconName});
+  Future<void> showUserLayer({
+    @required String arrowIconName,
+    @required String pinIconName,
+  }) async {
+    await _channel.invokeMethod<void>('showUserLayer', <String, dynamic>{
+      'arrowIconName': arrowIconName,
+      'pinIconName': pinIconName,
+    });
   }
 
   /// Hides an icon at current user location
@@ -77,7 +82,8 @@ class YandexMapController extends ChangeNotifier {
     @required Point src,
     @required Point dest,
   }) async {
-    await _channel.invokeMethod<void>('requestMasstransitRoute', <String, dynamic>{
+    await _channel
+        .invokeMethod<void>('requestMasstransitRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
@@ -89,7 +95,8 @@ class YandexMapController extends ChangeNotifier {
     @required Point src,
     @required Point dest,
   }) async {
-    await _channel.invokeMethod<void>('requestPedestrianRoute', <String, dynamic>{
+    await _channel
+        .invokeMethod<void>('requestPedestrianRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
@@ -109,11 +116,24 @@ class YandexMapController extends ChangeNotifier {
     });
   }
 
+  Future<void> requestDrivingRoute({
+    @required Point src,
+    @required Point dest,
+  }) async {
+    await _channel.invokeMethod<void>('requestDrivingRoute', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
   Future<String> estimateMasstransitRoute({
     @required Point src,
     @required Point dest,
   }) async {
-    return _channel.invokeMethod<String>('estimateMasstransitRoute', <String, dynamic>{
+    return _channel
+        .invokeMethod<String>('estimateMasstransitRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
@@ -125,7 +145,8 @@ class YandexMapController extends ChangeNotifier {
     @required Point src,
     @required Point dest,
   }) async {
-    return _channel.invokeMethod<String>('estimatePedestrianRoute', <String, dynamic>{
+    return _channel
+        .invokeMethod<String>('estimatePedestrianRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
@@ -137,7 +158,21 @@ class YandexMapController extends ChangeNotifier {
     @required Point src,
     @required Point dest,
   }) async {
-    return _channel.invokeMethod<String>('estimateBicycleRoute', <String, dynamic>{
+    return _channel
+        .invokeMethod<String>('estimateBicycleRoute', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
+  Future<String> estimateDrivingRoute({
+    @required Point src,
+    @required Point dest,
+  }) async {
+    return _channel
+        .invokeMethod<String>('estimateDrivingRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
@@ -200,12 +235,11 @@ class YandexMapController extends ChangeNotifier {
   }
 
   Future<void> updatePlacemarkPoint(Placemark placemark, Point point) async {
-    await _channel.invokeMethod<void>(
-        'updatePlacemarkPoint', <String, dynamic>{
-          'hashCode': placemark.hashCode,
-          'latitude': point.latitude,
-          'longitude': point.longitude,
-        });
+    await _channel.invokeMethod<void>('updatePlacemarkPoint', <String, dynamic>{
+      'hashCode': placemark.hashCode,
+      'latitude': point.latitude,
+      'longitude': point.longitude,
+    });
   }
 
   /// Does nothing if passed `Polyline` is `null`
