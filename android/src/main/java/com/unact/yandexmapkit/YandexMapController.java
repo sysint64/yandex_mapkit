@@ -643,7 +643,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     // Set its color depending on the information which the section contains
     MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
     PolylineMapObject polylineMapObject = mapObjects.addPolyline(geometry);
-    polylineMapObject.setStrokeColor(0xFF0000FF);
+    polylineMapObject.setStrokeColor(0xFFA06ED9);
     routePolylines.add(polylineMapObject);
   }
 
@@ -694,16 +694,16 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         if (sectionVehicleType == null) {
           return 0x00000000;
         } else if (sectionVehicleType.equals("bus")) {
-          return 0xFF00FF00;  // Green
+          return 0xFF33B609;  // Green
         } else if (sectionVehicleType.equals("tramway")) {
-          return 0xFFFF0000;  // Red
+          return 0xFF33B609;  // Red
         }
       }
-      return 0xFF0000FF;  // Blue
+      return 0xFFA06ED9;  // Blue
     } else {
       // This is not a public transport ride section
       // In this example let us draw it in black
-      return 0xFF000000;  // Black
+      return 0xFF7073EE;  // Black
     }
   }
 
@@ -779,7 +779,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
         MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
         PolylineMapObject polylineMapObject = mapObjects.addPolyline(route.getGeometry());
-        polylineMapObject.setStrokeColor(0xFF0000FF);
+        polylineMapObject.setStrokeColor(0xFFA06ED9);
         routePolylines.add(polylineMapObject);
       }
     }
