@@ -17,6 +17,7 @@ import android.graphics.BitmapFactory;
 import com.yandex.mapkit.*;
 import com.yandex.mapkit.directions.DirectionsFactory;
 import com.yandex.mapkit.geometry.BoundingBox;
+import com.yandex.mapkit.geometry.Geo;
 import com.yandex.mapkit.geometry.Point;
 import com.yandex.mapkit.geometry.Polyline;
 import com.yandex.mapkit.geometry.SubpolylineHelper;
@@ -419,15 +420,37 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private void search(MethodCall call) {
     final Map<String, Object> params = ((Map<String, Object>) call.arguments);
     final String query = (String) params.get("query");
+    final Double userPositionLatitude = (Double) params.get("userPositionLatitude");
+    final Double userPositionLongitude = (Double) params.get("userPositionLongitude");
+
+    final SearchOptions options = new SearchOptions();
+
+    if (userPositionLatitude != null && userPositionLongitude != null) {
+      final Point userPosition = new Point(userPositionLatitude, userPositionLongitude);
+      options.setUserPosition(userPosition);
+    }
 
     if (query != null) {
       searchSession = searchManager.submit(
         query,
         VisibleRegionUtils.toPolygon(mapView.getMap().getVisibleRegion()),
-        new SearchOptions(),
+        options,
         this
       );
     }
+  }
+
+  private double getDistance(MethodCall call) {
+    final Map<String, Object> params = ((Map<String, Object>) call.arguments);
+    final Double srcLatitude = (Double) params.get("srcLatitude");
+    final Double srcLongitude = (Double) params.get("srcLongitude");
+    final Double destLatitude = (Double) params.get("destLatitude");
+    final Double destLongitude = (Double) params.get("destLongitude");
+
+    return Geo.distance(
+      new Point(srcLatitude, srcLongitude),
+      new Point(destLatitude, destLongitude)
+    );
   }
 
   private void clearRoute() {
@@ -537,6 +560,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       case "search":
         searchChannel = result;
         search(call);
+        break;
+      case "distance":
+        double distance = getDistance(call);
+        result.success(distance);
         break;
       default:
         result.notImplemented();

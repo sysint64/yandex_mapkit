@@ -242,6 +242,15 @@ class YandexMapController extends ChangeNotifier {
     });
   }
 
+  Future<double> getDistance(Point src, Point dest) async {
+    return await _channel.invokeMethod<double>('distance', <String, dynamic>{
+      'srcLatitude': src.latitude,
+      'srcLongitude': src.longitude,
+      'destLatitude': dest.latitude,
+      'destLongitude': dest.longitude,
+    });
+  }
+
   /// Does nothing if passed `Polyline` is `null`
   Future<void> addPolyline(Polyline polyline) async {
     if (polyline != null) {
