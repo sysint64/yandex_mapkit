@@ -82,13 +82,15 @@ class YandexMapController extends ChangeNotifier {
     @required Point src,
     @required Point dest,
   }) async {
-    await _channel
-        .invokeMethod<void>('requestMasstransitRoute', <String, dynamic>{
+    final String data = await _channel
+        .invokeMethod<String>('requestMasstransitRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
       'destLongitude': dest.longitude,
     });
+
+    debugPrint(data);
   }
 
   Future<void> requestPedestrianRoute({

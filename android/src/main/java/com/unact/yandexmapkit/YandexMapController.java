@@ -7,8 +7,6 @@ import android.content.pm.PackageManager;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 
-import android.graphics.Color;
-import android.graphics.PointF;
 import android.util.Log;
 import android.view.View;
 import android.graphics.Bitmap;
@@ -67,6 +65,8 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   private UserLocationLayer userLocationLayer;
   private List<PlacemarkMapObject> placemarks = new ArrayList<>();
   private List<PolylineMapObject> polylines = new ArrayList<>();
+  private List<SectionInfo> masstransitSectionInfoList = new ArrayList<>();
+  private List<RoutePoint> masstransitRoutePointsList = new ArrayList<>();
   private String userLocationArrowIconName;
   private String userLocationPinIconName;
 
@@ -561,7 +561,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         searchChannel = result;
         search(call);
         break;
-      case "distance":
+      case "walkingDistance":
         double distance = getDistance(call);
         result.success(distance);
         break;
@@ -573,6 +573,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public void onMasstransitRoutes(@NonNull List<Route> routes) {
+    masstransitSectionInfoList.clear();
+    masstransitRoutePointsList.clear();
+
     Log.e("MasstransitRoutes", "TEST");
     // In this example we consider first alternative only
     if (routes.size() > 0) {
@@ -585,17 +588,89 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         Log.e("MasstransitRoutes", "ST SECTION");
         for (Section section : routes.get(0).getSections()) {
           drawSection(
-            section.getMetadata().getData(),
-            SubpolylineHelper.subpolyline(
-              routes.get(0).getGeometry(), section.getGeometry()));
+            section,
+            SubpolylineHelper.subpolyline(routes.get(0).getGeometry(), section.getGeometry())
+          );
         }
         Log.e("MasstransitRoutes", "ED SECTION");
       }
     }
 
-    if (buildRouteChannel != null) {
-      buildRouteChannel.success(null);
+    masstransitSectionInfoList = mergeSectionInfoList(masstransitSectionInfoList);
+    masstransitRoutePointsList = createRoutePoints(masstransitSectionInfoList);
+
+    StringBuilder list = new StringBuilder();
+
+    list.append("----------------\n");
+    list.append("Sections\n");
+    list.append("----------------\n");
+
+    for (SectionInfo info : masstransitSectionInfoList) {
+      list.append(info.toString());
     }
+
+    list.append("----------------\n");
+    list.append("Points\n");
+    list.append("----------------\n");
+
+    for (RoutePoint point : masstransitRoutePointsList) {
+      list.append(point.toString());
+    }
+
+    if (buildRouteChannel != null) {
+      buildRouteChannel.success(list.toString());
+    }
+  }
+
+  private List<RoutePoint> createRoutePoints(List<SectionInfo> sections) {
+    final List<RoutePoint> points = new ArrayList<>();
+    return points;
+  }
+
+  private List<SectionInfo> mergeSectionInfoList(List<SectionInfo> sections) {
+    final List<SectionInfo> optimizedSections = new ArrayList<>();
+    SectionInfo prevSection = null;
+
+    for (final SectionInfo section : sections) {
+      if (prevSection != null) {
+        if (prevSection.tag.equals("pedestrian") && section.tag.equals("pedestrian")) {
+          prevSection = new SectionInfo(
+            /* tag */ prevSection.tag,
+            /* duration */ prevSection.duration + section.duration,
+            /* walkingDistance */ prevSection.walkingDistance + section.walkingDistance,
+            /* color */ prevSection.color,
+            /* points */ mergePoints(prevSection.points, section.points)  // TODO
+          );
+        } else {
+          optimizedSections.add(prevSection);
+          prevSection = section;
+        }
+      } else {
+        prevSection = section;
+      }
+    }
+
+    if (prevSection != null) {
+      optimizedSections.add(prevSection);
+    }
+
+    return optimizedSections;
+  }
+
+  private List<RoutePoint> mergePoints(List<RoutePoint> p1, List<RoutePoint> p2) {
+    final List<RoutePoint> points = new ArrayList<>();
+
+    final RoutePoint point1 = maxPoint(p1.get(0), p2.get(0));
+    final RoutePoint point2 = maxPoint(p1.get(1), p2.get(1));
+
+    points.add(point1);
+    points.add(point2);
+
+    return points;
+  }
+
+  private RoutePoint maxPoint(RoutePoint p1, RoutePoint p2) {
+    return p1.zIndex > p2.zIndex ? p1 : p2;
   }
 
   @Override
@@ -647,20 +722,153 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     routePolylines.add(polylineMapObject);
   }
 
-  private void drawSection(
-    SectionMetadata.SectionData data,
-    Polyline geometry
-  ) {
+  private void drawSection(Section section, Polyline geometry) {
     // Draw a section polyline on a map
     // Set its color depending on the information which the section contains
     MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
     PolylineMapObject polylineMapObject = mapObjects.addPolyline(geometry);
-    final int color = getMasstransitSectionColor(data);
-    polylineMapObject.setStrokeColor(color);
-    routePolylines.add(polylineMapObject);
+    final SectionInfo info = getMasstransitSectionInfo(section);
+
+    polylineMapObject.setStrokeColor(info.color);
+    masstransitSectionInfoList.add(info);
+//    masstransitRoutePointsList.add();
   }
 
-  private int getMasstransitSectionColor(SectionMetadata.SectionData data) {
+  static class RoutePoint {
+    final String name;
+    final int color;
+    final int zIndex;
+
+    RoutePoint(String name, int color, int zIndex) {
+      this.name = name;
+      this.color = color;
+      this.zIndex = zIndex;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+      return "  RoutePoint(\n" +
+              "    name: " + name + ",\n" +
+              "    color: " + color + ",\n" +
+              "    zIndex: " + zIndex + "\n" +
+              "  )\n";
+    }
+  }
+
+  static class SectionInfo {
+    final String tag;
+    final double duration;
+    final double walkingDistance;
+    final int color;
+    final List<RoutePoint> points;
+
+    SectionInfo(String tag, double duration, double distance, int color, List<RoutePoint> points) {
+      this.tag = tag;
+      this.duration = duration;
+      this.walkingDistance = distance;
+      this.color = color;
+      this.points = points;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+      return "SectionInfo(\n" +
+              "  tag: " + tag + ",\n" +
+              "  duration: " + duration + ",\n" +
+              "  walkingDistance: " + walkingDistance + ",\n" +
+              "  color: " + color + ",\n" +
+              "  points: " + pointsToString() + "\n" +
+              ")\n";
+    }
+
+    protected String pointsToString() {
+      final StringBuilder builder = new StringBuilder();
+      builder.append("[\n");
+
+      for (final RoutePoint point : points) {
+        builder.append(point.toString());
+      }
+
+      builder.append("]\n");
+      return builder.toString();
+    }
+  }
+
+  static class SectionMetro extends SectionInfo {
+    final String lineName;
+    final String lineId;
+    final String directionDesc;
+    final String interval;
+    final List<String> intermediateStations;
+
+    SectionMetro(
+      String tag,
+      double duration,
+      double walkingDistance,
+      int color,
+      String lineName,
+      String lineId,
+      String directionDesc,
+      String interval,
+      List<String> intermediateStations,
+      List<RoutePoint> points
+    ) {
+      super(tag, duration, walkingDistance, color, points);
+
+      this.lineName = lineName;
+      this.lineId = lineId;
+      this.directionDesc = directionDesc;
+      this.interval = interval;
+      this.intermediateStations = intermediateStations;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+      return "SectionMetro(\n" +
+              "  tag: " + tag + ",\n" +
+              "  duration: " + duration + ",\n" +
+              "  walkingDistance: " + walkingDistance + ",\n" +
+              "  color: " + color + ",\n" +
+              "  lineName: " + lineName + ",\n" +
+              "  lineId: " + lineId + ",\n" +
+              "  directionDesc: " + directionDesc + ",\n" +
+              "  interval: " + interval + ",\n" +
+              "  intermediateStations: " + intermediateStationsToString() + ",\n" +
+              "  points: " + pointsToString() + "\n" +
+              ")\n";
+    }
+
+    private String intermediateStationsToString() {
+      final StringBuilder builder = new StringBuilder();
+      builder.append("[");
+
+      for (final String stop : intermediateStations) {
+        builder.append(stop);
+        //noinspection StringEquality
+        if (stop != intermediateStations.get(intermediateStations.size() - 1)) {
+          builder.append(", ");
+        }
+      }
+
+      builder.append("]");
+      return builder.toString();
+    }
+  }
+
+  private SectionInfo getMasstransitSectionInfo(Section section) {
+    int color = 0xFFA06ED9;
+    String tag = "";
+    String lineName = "";
+    String lineId = "?";
+    String directionDesc = "";
+    List<String> intermediateStations = new ArrayList<>();
+    final SectionMetadata.SectionData data = section.getMetadata().getData();
+    final List<RoutePoint> points = new ArrayList<>();
+    int zIndex = 0;
+
     // Masstransit route section defines exactly one on the following
     // 1. Wait until public transport unit arrives
     // 2. Walk
@@ -676,34 +884,116 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       // along a similar geometry
       for (Transport transport : data.getTransports()) {
         final Line.Style style = transport.getLine().getStyle();
+        lineName = transport.getLine().getName();
+//        lineId = transport.getTransports().get(0).getThread().getId();
         // Some public transport lines may have a color associated with them
         // Typically this is the case of underground lines
         if (style != null && style.getColor() != null) {
           // The color is in RRGGBB 24-bit format
           // Convert it to AARRGGBB 32-bit format, set alpha to 255 (opaque)
-          return style.getColor() | 0xFF000000;
+          color = style.getColor() | 0xFF000000;
+          break;
         }
       }
       // Let us draw bus lines in green and tramway lines in red
       // Draw any other public transport lines in blue
       HashSet<String> knownVehicleTypes = new HashSet<>();
+
       knownVehicleTypes.add("bus");
       knownVehicleTypes.add("tramway");
+      knownVehicleTypes.add("underground");
+
       for (Transport transport : data.getTransports()) {
         String sectionVehicleType = getVehicleType(transport, knownVehicleTypes);
         if (sectionVehicleType == null) {
-          return 0x00000000;
+          break;
         } else if (sectionVehicleType.equals("bus")) {
-          return 0xFF33B609;  // Green
+          color = 0xFF33B609;  // Green
+          tag = "bus";
+          zIndex = 1;
         } else if (sectionVehicleType.equals("tramway")) {
-          return 0xFF33B609;  // Red
+          color = 0xFF33B609;  // Red
+          tag = "tramway";
+          zIndex = 2;
+        } else if (sectionVehicleType.equals("underground")) {
+          tag = "underground";
+          zIndex = 3;
         }
       }
-      return 0xFFA06ED9;  // Blue
     } else {
       // This is not a public transport ride section
       // In this example let us draw it in black
-      return 0xFF7073EE;  // Black
+      color = 0xFF7073EE;
+      tag = "pedestrian";
+    }
+
+    final double duration = section.getMetadata().getWeight().getTime().getValue();
+    final double walkingDistance = section.getMetadata().getWeight().getWalkingDistance().getValue();
+
+    if (section.getStops().size() > 0) {
+      final List<RouteStop> stops = section.getStops();
+      points.add(
+        new RoutePoint(
+          /* name */ section.getStops().get(0).getStop().getName(),
+          /* color */ color,
+          /* zIndex */ zIndex
+        )
+      );
+
+      points.add(
+        new RoutePoint(
+          /* name */ section.getStops().get(section.getStops().size() - 1).getStop().getName(),
+          /* color */ color,
+          /* zIndex */ zIndex
+        )
+      );
+    } else {
+      points.add(
+        new RoutePoint(
+          /* name */ "",
+          /* color */ 0,
+          /* zIndex */ -1
+        )
+      );
+
+      points.add(
+        new RoutePoint(
+          /* name */ "",
+          /* color */ 0,
+          /* zIndex */ -1
+        )
+      );
+    }
+
+    if (section.getStops().size() > 2) {
+      directionDesc = section.getStops().get(1).getStop().getName();
+
+      for (RouteStop stop : section.getStops()) {
+        intermediateStations.add(stop.getStop().getName());
+      }
+    }
+
+    if (tag.equals("underground")) {
+      return new SectionMetro(
+        /* tag */ tag,
+        /* duration */ duration,
+        /* walkingDistance */ walkingDistance,
+        /* color */ color,
+        /* lineName */ lineName,
+        /* lineId */ lineId,  // ???
+        /* directionDesc */ directionDesc,
+        /* interval */ "?",
+        /* intermediateStation */ intermediateStations,
+        /* points */ points
+      );
+    } else {
+      return new SectionInfo(
+        /* tag */ tag,
+        /* duration */ duration,
+        /* walkingDistance */ walkingDistance,
+        /* color */ color,
+        /* points */ points
+      );
     }
   }
 
