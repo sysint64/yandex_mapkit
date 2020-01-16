@@ -56,7 +56,138 @@ import io.flutter.plugin.platform.PlatformView;
 
 public class YandexMapController implements PlatformView, MethodChannel.MethodCallHandler,
   RouteListener, SearchListener, com.yandex.mapkit.transport.bicycle.Session.RouteListener,
-  DrivingSession.DrivingRouteListener {
+  DrivingSession.DrivingRouteListener
+{
+  static class PointBound {
+    final RoutePoint startPoint;
+    final RoutePoint endPoint;
+
+    PointBound(RoutePoint startPoint, RoutePoint endPoint) {
+      this.startPoint = startPoint;
+      this.endPoint = endPoint;
+    }
+  }
+
+  static class RoutePoint {
+    final String name;
+    final int color;
+    final int zIndex;
+
+    RoutePoint(String name, int color, int zIndex) {
+      this.name = name;
+      this.color = color;
+      this.zIndex = zIndex;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+      return "  RoutePoint(\n" +
+        "    name: " + name + ",\n" +
+        "    color: " + color + ",\n" +
+        "    zIndex: " + zIndex + "\n" +
+        "  )\n";
+    }
+  }
+
+  static class SectionInfo {
+    final String tag;
+    final double duration;
+    final double walkingDistance;
+    final int color;
+    final PointBound points;
+
+    SectionInfo(
+      String tag,
+      double duration,
+      double distance,
+      int color,
+      PointBound points
+    ) {
+      this.tag = tag;
+      this.duration = duration;
+      this.walkingDistance = distance;
+      this.color = color;
+      this.points = points;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+      return "SectionInfo(\n" +
+        "  tag: " + tag + ",\n" +
+        "  duration: " + duration + ",\n" +
+        "  walkingDistance: " + walkingDistance + ",\n" +
+        "  color: " + color + ",\n" +
+        "  points.startPoint: " + points.startPoint.toString() +
+        "  points.endPoint: " + points.endPoint.toString() +
+        ")\n";
+    }
+  }
+
+  static class SectionMetro extends SectionInfo {
+    final String lineName;
+    final String lineId;
+    final String directionDesc;
+    final String interval;
+    final List<String> intermediateStations;
+
+    SectionMetro(
+      String tag,
+      double duration,
+      double walkingDistance,
+      int color,
+      String lineName,
+      String lineId,
+      String directionDesc,
+      String interval,
+      List<String> intermediateStations,
+      PointBound points
+    ) {
+      super(tag, duration, walkingDistance, color, points);
+
+      this.lineName = lineName;
+      this.lineId = lineId;
+      this.directionDesc = directionDesc;
+      this.interval = interval;
+      this.intermediateStations = intermediateStations;
+    }
+
+    @NonNull
+    @Override
+    public String toString() {
+      return "SectionMetro(\n" +
+        "  tag: " + tag + ",\n" +
+        "  duration: " + duration + ",\n" +
+        "  walkingDistance: " + walkingDistance + ",\n" +
+        "  color: " + color + ",\n" +
+        "  lineName: " + lineName + ",\n" +
+        "  lineId: " + lineId + ",\n" +
+        "  directionDesc: " + directionDesc + ",\n" +
+        "  interval: " + interval + ",\n" +
+        "  intermediateStations: " + intermediateStationsToString() + ",\n" +
+        "  points.startPoint: " + points.startPoint.toString() +
+        "  points.endPoint: " + points.endPoint.toString() +
+        ")\n";
+    }
+
+    private String intermediateStationsToString() {
+      final StringBuilder builder = new StringBuilder();
+      builder.append("[");
+
+      for (final String stop : intermediateStations) {
+        builder.append(stop);
+        //noinspection StringEquality
+        if (stop != intermediateStations.get(intermediateStations.size() - 1)) {
+          builder.append(", ");
+        }
+      }
+
+      builder.append("]");
+      return builder.toString();
+    }
+  }
+
   private final MapView mapView;
   private final MethodChannel methodChannel;
   private final PluginRegistry.Registrar pluginRegistrar;
@@ -561,7 +692,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         searchChannel = result;
         search(call);
         break;
-      case "walkingDistance":
+      case "distance":
         double distance = getDistance(call);
         result.success(distance);
         break;
@@ -624,6 +755,27 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   private List<RoutePoint> createRoutePoints(List<SectionInfo> sections) {
     final List<RoutePoint> points = new ArrayList<>();
+
+    if (sections.isEmpty()) {
+      return points;
+    }
+
+    // Add bound point
+    points.add(sections.get(0).points.startPoint);
+    SectionInfo nextSection;
+
+    for (int i = 0; i < sections.size() - 1; i += 1) {
+      final SectionInfo section = sections.get(i);
+      nextSection = sections.get(i + 1);
+
+      final RoutePoint p1 = section.points.endPoint;
+      final RoutePoint p2 = nextSection.points.startPoint;
+
+      points.add(maxPoint(p1, p2));
+    }
+
+    // Add bound point
+    points.add(sections.get(sections.size() - 1).points.endPoint);
     return points;
   }
 
@@ -639,7 +791,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
             /* duration */ prevSection.duration + section.duration,
             /* walkingDistance */ prevSection.walkingDistance + section.walkingDistance,
             /* color */ prevSection.color,
-            /* points */ mergePoints(prevSection.points, section.points)  // TODO
+            /* points */ mergePoints(prevSection.points, section.points)
           );
         } else {
           optimizedSections.add(prevSection);
@@ -657,16 +809,11 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     return optimizedSections;
   }
 
-  private List<RoutePoint> mergePoints(List<RoutePoint> p1, List<RoutePoint> p2) {
-    final List<RoutePoint> points = new ArrayList<>();
-
-    final RoutePoint point1 = maxPoint(p1.get(0), p2.get(0));
-    final RoutePoint point2 = maxPoint(p1.get(1), p2.get(1));
-
-    points.add(point1);
-    points.add(point2);
-
-    return points;
+  private PointBound mergePoints(PointBound b1, PointBound b2) {
+    return new PointBound(
+      /* startPoint */ maxPoint(b1.startPoint, b2.startPoint),
+      /* endPoint */ maxPoint(b1.endPoint, b2.endPoint)
+    );
   }
 
   private RoutePoint maxPoint(RoutePoint p1, RoutePoint p2) {
@@ -731,131 +878,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     polylineMapObject.setStrokeColor(info.color);
     masstransitSectionInfoList.add(info);
-//    masstransitRoutePointsList.add();
-  }
-
-  static class RoutePoint {
-    final String name;
-    final int color;
-    final int zIndex;
-
-    RoutePoint(String name, int color, int zIndex) {
-      this.name = name;
-      this.color = color;
-      this.zIndex = zIndex;
-    }
-
-    @NonNull
-    @Override
-    public String toString() {
-      return "  RoutePoint(\n" +
-              "    name: " + name + ",\n" +
-              "    color: " + color + ",\n" +
-              "    zIndex: " + zIndex + "\n" +
-              "  )\n";
-    }
-  }
-
-  static class SectionInfo {
-    final String tag;
-    final double duration;
-    final double walkingDistance;
-    final int color;
-    final List<RoutePoint> points;
-
-    SectionInfo(String tag, double duration, double distance, int color, List<RoutePoint> points) {
-      this.tag = tag;
-      this.duration = duration;
-      this.walkingDistance = distance;
-      this.color = color;
-      this.points = points;
-    }
-
-    @NonNull
-    @Override
-    public String toString() {
-      return "SectionInfo(\n" +
-              "  tag: " + tag + ",\n" +
-              "  duration: " + duration + ",\n" +
-              "  walkingDistance: " + walkingDistance + ",\n" +
-              "  color: " + color + ",\n" +
-              "  points: " + pointsToString() + "\n" +
-              ")\n";
-    }
-
-    protected String pointsToString() {
-      final StringBuilder builder = new StringBuilder();
-      builder.append("[\n");
-
-      for (final RoutePoint point : points) {
-        builder.append(point.toString());
-      }
-
-      builder.append("]\n");
-      return builder.toString();
-    }
-  }
-
-  static class SectionMetro extends SectionInfo {
-    final String lineName;
-    final String lineId;
-    final String directionDesc;
-    final String interval;
-    final List<String> intermediateStations;
-
-    SectionMetro(
-      String tag,
-      double duration,
-      double walkingDistance,
-      int color,
-      String lineName,
-      String lineId,
-      String directionDesc,
-      String interval,
-      List<String> intermediateStations,
-      List<RoutePoint> points
-    ) {
-      super(tag, duration, walkingDistance, color, points);
-
-      this.lineName = lineName;
-      this.lineId = lineId;
-      this.directionDesc = directionDesc;
-      this.interval = interval;
-      this.intermediateStations = intermediateStations;
-    }
-
-    @NonNull
-    @Override
-    public String toString() {
-      return "SectionMetro(\n" +
-              "  tag: " + tag + ",\n" +
-              "  duration: " + duration + ",\n" +
-              "  walkingDistance: " + walkingDistance + ",\n" +
-              "  color: " + color + ",\n" +
-              "  lineName: " + lineName + ",\n" +
-              "  lineId: " + lineId + ",\n" +
-              "  directionDesc: " + directionDesc + ",\n" +
-              "  interval: " + interval + ",\n" +
-              "  intermediateStations: " + intermediateStationsToString() + ",\n" +
-              "  points: " + pointsToString() + "\n" +
-              ")\n";
-    }
-
-    private String intermediateStationsToString() {
-      final StringBuilder builder = new StringBuilder();
-      builder.append("[");
-
-      for (final String stop : intermediateStations) {
-        builder.append(stop);
-        //noinspection StringEquality
-        if (stop != intermediateStations.get(intermediateStations.size() - 1)) {
-          builder.append(", ");
-        }
-      }
-
-      builder.append("]");
-      return builder.toString();
-    }
+    routePolylines.add(polylineMapObject);
   }
 
   private SectionInfo getMasstransitSectionInfo(Section section) {
@@ -866,7 +889,6 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     String directionDesc = "";
     List<String> intermediateStations = new ArrayList<>();
     final SectionMetadata.SectionData data = section.getMetadata().getData();
-    final List<RoutePoint> points = new ArrayList<>();
     int zIndex = 0;
 
     // Masstransit route section defines exactly one on the following
@@ -929,46 +951,43 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     final double duration = section.getMetadata().getWeight().getTime().getValue();
     final double walkingDistance = section.getMetadata().getWeight().getWalkingDistance().getValue();
+    final RoutePoint startPoint;
+    final RoutePoint endPoint;
 
     if (section.getStops().size() > 0) {
-      final List<RouteStop> stops = section.getStops();
-      points.add(
-        new RoutePoint(
-          /* name */ section.getStops().get(0).getStop().getName(),
-          /* color */ color,
-          /* zIndex */ zIndex
-        )
+      startPoint = new RoutePoint(
+        /* name */ section.getStops().get(0).getStop().getName(),
+        /* color */ color,
+        /* zIndex */ zIndex
       );
 
-      points.add(
-        new RoutePoint(
-          /* name */ section.getStops().get(section.getStops().size() - 1).getStop().getName(),
-          /* color */ color,
-          /* zIndex */ zIndex
-        )
+      endPoint = new RoutePoint(
+        /* name */ section.getStops().get(section.getStops().size() - 1).getStop().getName(),
+        /* color */ color,
+        /* zIndex */ zIndex
       );
     } else {
-      points.add(
-        new RoutePoint(
-          /* name */ "",
-          /* color */ 0,
-          /* zIndex */ -1
-        )
+      startPoint = new RoutePoint(
+        /* name */ "",
+        /* color */ 0,
+        /* zIndex */ -1
       );
 
-      points.add(
-        new RoutePoint(
-          /* name */ "",
-          /* color */ 0,
-          /* zIndex */ -1
-        )
+      endPoint = new RoutePoint(
+        /* name */ "",
+        /* color */ 0,
+        /* zIndex */ -1
       );
     }
+
+    final PointBound points = new PointBound(startPoint, endPoint);
 
     if (section.getStops().size() > 2) {
       directionDesc = section.getStops().get(1).getStop().getName();
 
-      for (RouteStop stop : section.getStops()) {
+      // Not including first and last stops
+      for (int i = 1; i < section.getStops().size() - 1; ++i) {
+        final RouteStop stop = section.getStops().get(i);
         intermediateStations.add(stop.getStop().getName());
       }
     }
