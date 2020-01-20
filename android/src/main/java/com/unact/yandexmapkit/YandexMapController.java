@@ -88,6 +88,16 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         "    zIndex: " + zIndex + "\n" +
         "  )\n";
     }
+
+    Map<String, Object> serialize() {
+      final Map<String, Object> map = new HashMap<>();
+
+      map.put("name", name);
+      map.put("color", color);
+      map.put("zIndex", zIndex);
+
+      return map;
+    }
   }
 
   static class SectionInfo {
@@ -122,6 +132,19 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         "  points.startPoint: " + points.startPoint.toString() +
         "  points.endPoint: " + points.endPoint.toString() +
         ")\n";
+    }
+
+    Map<String, Object> serialize() {
+      final Map<String, Object> map = new HashMap<>();
+
+      map.put("tag", tag);
+      map.put("duration", duration);
+      map.put("walkingDistance", walkingDistance);
+      map.put("color", color);
+      map.put("points.startPoint", points.startPoint.serialize());
+      map.put("points.endPoint", points.endPoint.serialize());
+
+      return map;
     }
   }
 
@@ -185,6 +208,25 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
       builder.append("]");
       return builder.toString();
+    }
+
+    @Override
+    Map<String, Object> serialize() {
+      final Map<String, Object> map = new HashMap<>();
+
+      map.put("tag", tag);
+      map.put("duration", duration);
+      map.put("walkingDistance", walkingDistance);
+      map.put("color", color);
+      map.put("lineName", lineName);
+      map.put("lineId", lineId);
+      map.put("directionDesc", directionDesc);
+      map.put("interval", interval);
+      map.put("intermediateStations.size", intermediateStations.size());
+      map.put("points.startPoint", points.startPoint.serialize());
+      map.put("points.endPoint", points.endPoint.serialize());
+
+      return map;
     }
   }
 
@@ -707,49 +749,42 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     masstransitSectionInfoList.clear();
     masstransitRoutePointsList.clear();
 
-    Log.e("MasstransitRoutes", "TEST");
     // In this example we consider first alternative only
     if (routes.size() > 0) {
       if (estimationRouteChannel != null) {
         final String estimation = routes.get(0).getMetadata().getWeight().getTime().getText();
         estimationRouteChannel.success(estimation);
-        Log.e("MasstransitRoutes", "EST");
         return;
       } else {
-        Log.e("MasstransitRoutes", "ST SECTION");
         for (Section section : routes.get(0).getSections()) {
           drawSection(
             section,
             SubpolylineHelper.subpolyline(routes.get(0).getGeometry(), section.getGeometry())
           );
         }
-        Log.e("MasstransitRoutes", "ED SECTION");
       }
     }
 
     masstransitSectionInfoList = mergeSectionInfoList(masstransitSectionInfoList);
     masstransitRoutePointsList = createRoutePoints(masstransitSectionInfoList);
 
-    StringBuilder list = new StringBuilder();
-
-    list.append("----------------\n");
-    list.append("Sections\n");
-    list.append("----------------\n");
-
-    for (SectionInfo info : masstransitSectionInfoList) {
-      list.append(info.toString());
-    }
-
-    list.append("----------------\n");
-    list.append("Points\n");
-    list.append("----------------\n");
-
-    for (RoutePoint point : masstransitRoutePointsList) {
-      list.append(point.toString());
-    }
-
     if (buildRouteChannel != null) {
-      buildRouteChannel.success(list.toString());
+      final Map<String, Object> result = new HashMap<>();
+      final List<Map<String, Object>> sections = new ArrayList<>();
+      final List<Map<String, Object>> points = new ArrayList<>();
+
+      for (SectionInfo section : masstransitSectionInfoList) {
+        sections.add(section.serialize());
+      }
+
+      for (RoutePoint point : masstransitRoutePointsList) {
+        points.add(point.serialize());
+      }
+
+      result.put("sections", sections);
+      result.put("points", points);
+
+      buildRouteChannel.success(result);
     }
   }
 
