@@ -1,10 +1,10 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:yandex_mapkit/src/geo_object.dart';
+import 'package:yandex_mapkit/src/route_data.dart';
 import 'package:yandex_mapkit/src/search_suggestion.dart';
 
 import 'map_animation.dart';
@@ -78,19 +78,30 @@ class YandexMapController extends ChangeNotifier {
         .invokeMethod<void>('setMapStyle', <String, dynamic>{'style': style});
   }
 
-  Future<void> requestMasstransitRoute({
+  Future<RouteInfo> requestMasstransitRoute({
     @required Point src,
     @required Point dest,
   }) async {
-    final String data = await _channel
-        .invokeMethod<String>('requestMasstransitRoute', <String, dynamic>{
+    final dynamic data = await _channel
+        .invokeMethod<dynamic>('requestMasstransitRoute', <String, dynamic>{
       'srcLatitude': src.latitude,
       'srcLongitude': src.longitude,
       'destLatitude': dest.latitude,
       'destLongitude': dest.longitude,
     });
 
-    debugPrint(data);
+    final List<dynamic> sectionsResponse = data['sections'];
+    final List<dynamic> pointsResponse = data['points'];
+
+    final List<SectionInfo> sections = sectionsResponse
+        .map((dynamic it) => createSectionInfoFromMap(it))
+        .toList();
+
+    final List<RoutePoint> points = pointsResponse
+        .map((dynamic it) => createRoutePointFromMap(it))
+        .toList();
+
+    return RouteInfo(sections, points);
   }
 
   Future<void> requestPedestrianRoute({
