@@ -148,14 +148,14 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     }
   }
 
-  static class SectionMetro extends SectionInfo {
+  static class SectionTransport extends SectionInfo {
     final String lineName;
     final String lineId;
     final String directionDesc;
     final String interval;
     final List<String> intermediateStations;
 
-    SectionMetro(
+    SectionTransport(
       String tag,
       double duration,
       double walkingDistance,
@@ -179,7 +179,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     @NonNull
     @Override
     public String toString() {
-      return "SectionMetro(\n" +
+      return "SectionTransport(\n" +
         "  tag: " + tag + ",\n" +
         "  duration: " + duration + ",\n" +
         "  walkingDistance: " + walkingDistance + ",\n" +
@@ -1027,25 +1027,25 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       }
     }
 
-    if (tag.equals("underground")) {
-      return new SectionMetro(
-        /* tag */ tag,
-        /* duration */ duration,
-        /* walkingDistance */ walkingDistance,
-        /* color */ color,
-        /* lineName */ lineName,
-        /* lineId */ lineId,  // ???
-        /* directionDesc */ directionDesc,
-        /* interval */ "?",
-        /* intermediateStation */ intermediateStations,
-        /* points */ points
-      );
-    } else {
+    if (tag.equals("pedestrian")) {
       return new SectionInfo(
         /* tag */ tag,
         /* duration */ duration,
         /* walkingDistance */ walkingDistance,
         /* color */ color,
+        /* points */ points
+      );
+    } else {
+      return new SectionTransport(
+        /* tag */ tag,
+        /* duration */ duration,
+        /* walkingDistance */ walkingDistance,
+        /* color */ color,
+        /* lineName */ lineName,
+        /* lineId */ "?",
+        /* directionDesc */ directionDesc,
+        /* interval */ "?",
+        /* intermediateStation */ intermediateStations,
         /* points */ points
       );
     }

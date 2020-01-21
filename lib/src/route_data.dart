@@ -37,14 +37,14 @@ class SectionInfo {
   });
 }
 
-class SectionMetro extends SectionInfo {
+class SectionTransport extends SectionInfo {
   final String lineName;
   final String lineId;
   final String directionDesc;
   final String interval;
   final int intermediateStationsSize;
 
-  SectionMetro({
+  SectionTransport({
     @required String tag,
     @required double duration,
     @required double walkingDistance,
@@ -68,7 +68,7 @@ class SectionMetro extends SectionInfo {
 
 SectionInfo createSectionInfoFromMap(dynamic data) {
   if (data['tag'] == 'underground') {
-    return SectionMetro(
+    return SectionTransport(
       tag: data['tag'],
       duration: data['duration'],
       walkingDistance: data['walkingDistance'],
