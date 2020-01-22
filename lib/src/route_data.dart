@@ -67,7 +67,7 @@ class SectionTransport extends SectionInfo {
 }
 
 SectionInfo createSectionInfoFromMap(dynamic data) {
-  if (data['tag'] == 'underground') {
+  if (data['tag'] != 'pedestrian') {
     return SectionTransport(
       tag: data['tag'],
       duration: data['duration'],
