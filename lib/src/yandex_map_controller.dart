@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -53,10 +54,17 @@ class YandexMapController extends ChangeNotifier {
     @required String arrowIconName,
     @required String pinIconName,
   }) async {
-    await _channel.invokeMethod<void>('showUserLayer', <String, dynamic>{
-      'arrowIconName': arrowIconName,
-      'pinIconName': pinIconName,
-    });
+    // (C) Ant, workaround to correctly run on iOS due to lack of 2 icons in this lib
+    if (Platform.isIOS) {
+      await _channel.invokeMethod<void>('showUserLayer', <String, dynamic>{
+        'iconName': arrowIconName,
+      });
+    } else {
+      await _channel.invokeMethod<void>('showUserLayer', <String, dynamic>{
+        'arrowIconName': arrowIconName,
+        'pinIconName': pinIconName,
+      });
+    }
   }
 
   /// Hides an icon at current user location
