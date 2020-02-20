@@ -5,4 +5,7 @@ class Point {
 
   final double latitude;
   final double longitude;
+
+  @override
+  String toString() => '$Point($latitude, $longitude)';
 }
