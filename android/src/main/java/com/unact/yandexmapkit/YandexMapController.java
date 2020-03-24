@@ -22,6 +22,9 @@ import com.yandex.mapkit.geometry.SubpolylineHelper;
 import com.yandex.mapkit.layers.GeoObjectTapEvent;
 import com.yandex.mapkit.layers.GeoObjectTapListener;
 import com.yandex.mapkit.layers.ObjectEvent;
+import com.yandex.mapkit.logo.Alignment;
+import com.yandex.mapkit.logo.HorizontalAlignment;
+import com.yandex.mapkit.logo.VerticalAlignment;
 import com.yandex.mapkit.map.*;
 import com.yandex.mapkit.mapview.MapView;
 import com.yandex.mapkit.search.*;
@@ -42,6 +45,7 @@ import com.yandex.mapkit.user_location.UserLocationView;
 import com.yandex.runtime.Error;
 import com.yandex.runtime.image.ImageProvider;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -273,6 +277,11 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     methodChannel = new MethodChannel(registrar.messenger(), "yandex_mapkit/yandex_map_" + id);
     methodChannel.setMethodCallHandler(this);
+
+    mapView
+            .getMap()
+            .getLogo()
+            .setAlignment(new Alignment(HorizontalAlignment.RIGHT, VerticalAlignment.TOP));
 
     masstransitRouter = TransportFactory.getInstance().createMasstransitRouter();
     pedestrianRouter = TransportFactory.getInstance().createPedestrianRouter();
@@ -537,16 +546,25 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   }
 
   private List<RequestPoint> getRouterPoints(MethodCall call) {
-    Map<String, Object> params = ((Map<String, Object>) call.arguments);
-
-    final Double srcLatitude = (Double) params.get("srcLatitude");
-    final Double srcLongitude = (Double) params.get("srcLongitude");
-    final Double destLatitude = (Double) params.get("destLatitude");
-    final Double destLongitude = (Double) params.get("destLongitude");
+    final List<Map<String, Object>> params = ((List<Map<String, Object>>) call.arguments);
 
     final List<RequestPoint> points = new ArrayList<>();
-    points.add(new RequestPoint(new Point(srcLatitude, srcLongitude), RequestPointType.WAYPOINT, null));
-    points.add(new RequestPoint(new Point(destLatitude, destLongitude), RequestPointType.WAYPOINT, null));
+
+    for (int i = 0; i < params.size(); ++i) {
+      RequestPointType type;
+
+      if (i == 0 || i == params.size() - 1) {
+        type =  RequestPointType.WAYPOINT;
+      } else {
+        type =  RequestPointType.VIAPOINT;
+      }
+
+      final Map<String, Object> point = params.get(i);
+      final Double latitude = (Double) point.get("latitude");
+      final Double longitude = (Double) point.get("longitude");
+
+      points.add(new RequestPoint(new Point(latitude, longitude), type, null));
+    }
 
     return points;
   }
@@ -588,6 +606,23 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     final DrivingOptions options = new DrivingOptions();
     drivingRouter.requestRoutes(getRouterPoints(call), options, this);
+  }
+
+  private void setFocusRect(MethodCall call) {
+    Map<String, Object> params = (Map<String, Object>) call.arguments;
+
+    final Double topLeft = (Double) params.get("topLeft");
+    final Double topRight = (Double) params.get("topRight");
+    final Double bottomLeft = (Double) params.get("bottomLeft");
+    final Double bottomRight = (Double) params.get("bottomRight");
+
+    mapView
+        .setFocusRect(
+          new ScreenRect(
+            new ScreenPoint(topLeft.floatValue(), topRight.floatValue()),
+            new ScreenPoint(bottomLeft.floatValue(), bottomRight.floatValue())
+          )
+        );
   }
 
   private void search(MethodCall call) {
@@ -737,6 +772,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       case "distance":
         double distance = getDistance(call);
         result.success(distance);
+        break;
+      case "setFocusRect":
+        setFocusRect(call);
+        result.success(null);
         break;
       default:
         result.notImplemented();

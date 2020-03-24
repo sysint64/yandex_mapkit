@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' show Platform;
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -86,119 +87,84 @@ class YandexMapController extends ChangeNotifier {
         .invokeMethod<void>('setMapStyle', <String, dynamic>{'style': style});
   }
 
-  Future<RouteInfo> requestMasstransitRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    final dynamic data = await _channel
-        .invokeMethod<dynamic>('requestMasstransitRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  List<Map<String, dynamic>> _pointsSerialize(Iterable<Point> points) {
+    return points
+        .map(
+          (Point it) => <String, dynamic>{
+            'latitude': it.latitude,
+            'longitude': it.longitude,
+          },
+        )
+        .toList();
+  }
+
+  Future<RouteInfo> requestMasstransitRoute(Iterable<Point> points) async {
+    final dynamic data = await _channel.invokeMethod<dynamic>(
+      'requestMasstransitRoute',
+      _pointsSerialize(points),
+    );
 
     final List<dynamic> sectionsResponse = data['sections'];
     final List<dynamic> pointsResponse = data['points'];
 
-    final List<SectionInfo> sections = sectionsResponse
+    final List<SectionInfo> routeSections = sectionsResponse
         .map((dynamic it) => createSectionInfoFromMap(it))
         .toList();
 
-    final List<RoutePoint> points = pointsResponse
+    final List<RoutePoint> routePoints = pointsResponse
         .map((dynamic it) => createRoutePointFromMap(it))
         .toList();
 
-    return RouteInfo(sections, points);
+    return RouteInfo(routeSections, routePoints);
   }
 
-  Future<void> requestPedestrianRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    await _channel
-        .invokeMethod<void>('requestPedestrianRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  Future<void> requestPedestrianRoute(Iterable<Point> points) async {
+    await _channel.invokeMethod<void>(
+      'requestPedestrianRoute',
+      _pointsSerialize(points),
+    );
   }
 
-  Future<void> requestBicycleRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    await _channel.invokeMethod<void>('requestBicycleRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  Future<void> requestBicycleRoute(Iterable<Point> points) async {
+    await _channel.invokeMethod<void>(
+      'requestBicycleRoute',
+      _pointsSerialize(points),
+    );
   }
 
-  Future<void> requestDrivingRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    await _channel.invokeMethod<void>('requestDrivingRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  Future<void> requestDrivingRoute(Iterable<Point> points) async {
+    await _channel.invokeMethod<void>(
+      'requestDrivingRoute',
+      _pointsSerialize(points),
+    );
   }
 
-  Future<String> estimateMasstransitRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    return _channel
-        .invokeMethod<String>('estimateMasstransitRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  Future<String> estimateMasstransitRoute(Iterable<Point> points) async {
+    return _channel.invokeMethod<String>(
+      'estimateMasstransitRoute',
+      _pointsSerialize(points),
+    );
   }
 
-  Future<String> estimatePedestrianRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    return _channel
-        .invokeMethod<String>('estimatePedestrianRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  Future<String> estimatePedestrianRoute(Iterable<Point> points) async {
+    return _channel.invokeMethod<String>(
+      'estimatePedestrianRoute',
+      _pointsSerialize(points),
+    );
   }
 
-  Future<String> estimateBicycleRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    return _channel
-        .invokeMethod<String>('estimateBicycleRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  Future<String> estimateBicycleRoute(Iterable<Point> points) async {
+    return _channel.invokeMethod<String>(
+      'estimateBicycleRoute',
+      _pointsSerialize(points),
+    );
   }
 
-  Future<String> estimateDrivingRoute({
-    @required Point src,
-    @required Point dest,
-  }) async {
-    return _channel
-        .invokeMethod<String>('estimateDrivingRoute', <String, dynamic>{
-      'srcLatitude': src.latitude,
-      'srcLongitude': src.longitude,
-      'destLatitude': dest.latitude,
-      'destLongitude': dest.longitude,
-    });
+  Future<String> estimateDrivingRoute(Iterable<Point> points) async {
+    return _channel.invokeMethod<String>(
+      'estimateDrivingRoute',
+      _pointsSerialize(points),
+    );
   }
 
   Future<void> clearRoutes() async {
@@ -235,6 +201,19 @@ class YandexMapController extends ChangeNotifier {
       'animate': animation != null,
       'smoothAnimation': animation?.smooth,
       'animationDuration': animation?.duration
+    });
+  }
+
+  Future<void> setFocusRect(
+      {@required double topLeft,
+      @required double topRight,
+      @required double bottomLeft,
+      @required double bottomRight}) async {
+    await _channel.invokeMethod<void>('setFocusRect', <String, dynamic>{
+      'topLeft': topLeft,
+      'topRight': topRight,
+      'bottomLeft': bottomLeft,
+      'bottomRight': bottomRight,
     });
   }
 

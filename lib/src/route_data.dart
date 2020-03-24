@@ -22,6 +22,7 @@ class RoutePoint {
 class SectionInfo {
   final String tag;
   final double duration;
+  final double distanceBetweenPoints;
   final double walkingDistance;
   final int color;
   final RoutePoint startPoint;
@@ -30,6 +31,7 @@ class SectionInfo {
   SectionInfo({
     @required this.tag,
     @required this.duration,
+    @required this.distanceBetweenPoints,
     @required this.walkingDistance,
     @required this.color,
     @required this.startPoint,
@@ -57,13 +59,13 @@ class SectionTransport extends SectionInfo {
     @required this.interval,
     @required this.intermediateStationsSize,
   }) : super(
-      tag: tag,
-      duration: duration,
-      walkingDistance: walkingDistance,
-      color: color,
-      startPoint: startPoint,
-      endPoint: endPoint,
-  );
+          tag: tag,
+          duration: duration,
+          walkingDistance: walkingDistance,
+          color: color,
+          startPoint: startPoint,
+          endPoint: endPoint,
+        );
 }
 
 SectionInfo createSectionInfoFromMap(dynamic data) {
@@ -83,20 +85,20 @@ SectionInfo createSectionInfoFromMap(dynamic data) {
     );
   } else {
     return SectionInfo(
-        tag: data['tag'],
-        duration: data['duration'],
-        walkingDistance: data['walkingDistance'],
-        color: data['color'],
-        startPoint: createRoutePointFromMap(data['points.startPoint']),
-        endPoint: createRoutePointFromMap(data['points.endPoint']),
+      tag: data['tag'],
+      duration: data['duration'],
+      walkingDistance: data['walkingDistance'],
+      color: data['color'],
+      startPoint: createRoutePointFromMap(data['points.startPoint']),
+      endPoint: createRoutePointFromMap(data['points.endPoint']),
     );
   }
 }
 
 RoutePoint createRoutePointFromMap(dynamic data) {
   return RoutePoint(
-      name: data['name'],
-      color: data['color'],
-      zIndex: data['zIndex'],
+    name: data['name'],
+    color: data['color'],
+    zIndex: data['zIndex'],
   );
 }
