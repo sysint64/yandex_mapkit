@@ -171,6 +171,12 @@ class YandexMapController extends ChangeNotifier {
     await _channel.invokeMethod<void>('clearRoutes');
   }
 
+  Future<void> clearAll() async {
+    placemarks.clear();
+    polylines.clear();
+    await _channel.invokeMethod<void>('clearAll');
+  }
+
   Future<void> move(
       {@required Point point,
       double zoom = kZoom,

@@ -671,6 +671,12 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     routePolylines.clear();
   }
 
+  private void clearAll() {
+    clearRoute();
+    final MapObjectCollection mapObjects = mapView.getMap().getMapObjects();
+    mapObjects.clear();
+  }
+
   @Override
   public void onMethodCall(MethodCall call, MethodChannel.Result result) {
     estimationRouteChannel = null;
@@ -772,6 +778,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       case "distance":
         double distance = getDistance(call);
         result.success(distance);
+        break;
+      case "clearAll":
+        clearAll();
+        result.success(null);
         break;
       case "setFocusRect":
         setFocusRect(call);
