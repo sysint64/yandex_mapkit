@@ -679,9 +679,6 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public void onMethodCall(MethodCall call, MethodChannel.Result result) {
-    estimationRouteChannel = null;
-    buildRouteChannel = null;
-
     switch (call.method) {
       case "showUserLayer":
         showUserLayer(call);
@@ -803,6 +800,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       if (estimationRouteChannel != null) {
         final String estimation = routes.get(0).getMetadata().getWeight().getTime().getText();
         estimationRouteChannel.success(estimation);
+        estimationRouteChannel = null;
         return;
       } else {
         for (Section section : routes.get(0).getSections()) {
@@ -834,6 +832,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       result.put("points", points);
 
       buildRouteChannel.success(result);
+      buildRouteChannel = null;
     }
   }
 
@@ -906,9 +905,17 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
   @Override
   public void onMasstransitRoutesError(@NonNull Error error) {
-    Log.e("MasstransitRoutesError", "Error" + error);
+    Log.e("MasstransitRoutesError", "Error: " + error);
     if (buildRouteChannel != null) {
-      buildRouteChannel.error("MasstransitRoutesError", error.toString(), error);
+      Log.e("MasstransitRoutesError", "Send error!");
+      buildRouteChannel.error("MasstransitRoutesError", error.toString(), null);
+      buildRouteChannel = null;
+    } else if (estimationRouteChannel != null) {
+      Log.e("MasstransitRoutesError", "Send error!");
+      estimationRouteChannel.error("MasstransitRoutesError", error.toString(), null);
+      estimationRouteChannel = null;
+    } else {
+      Log.e("MasstransitRoutesError", "Result is null");
     }
   }
 
@@ -918,6 +925,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       if (estimationRouteChannel != null) {
         final String estimation = routes.get(0).getWeight().getTime().getText();
         estimationRouteChannel.success(estimation);
+        estimationRouteChannel = null;
       } else {
         for (com.yandex.mapkit.transport.bicycle.Section section : routes.get(0).getSections()) {
           drawBicycleSection(
@@ -930,6 +938,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     if (buildRouteChannel != null) {
       buildRouteChannel.success(null);
+      buildRouteChannel = null;
     }
   }
 
@@ -937,7 +946,13 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public void onBicycleRoutesError(@NonNull Error error) {
     Log.e("BicycleRoutesError", "Error" + error);
     if (buildRouteChannel != null) {
-      buildRouteChannel.error("BicycleRoutesError", error.toString(), error);
+      buildRouteChannel.error("BicycleRoutesError", error.toString(), null);
+      buildRouteChannel = null;
+    } else if (estimationRouteChannel != null) {
+      estimationRouteChannel.error("BicycleRoutesError", error.toString(), null);
+      estimationRouteChannel = null;
+    } else {
+      Log.e("BicycleRoutesError", "Result is null");
     }
   }
 
@@ -1167,6 +1182,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       if (estimationRouteChannel != null) {
         final String estimation = routes.get(0).getMetadata().getWeight().getTime().getText();
         estimationRouteChannel.success(estimation);
+        estimationRouteChannel = null;
       } else {
         final DrivingRoute route = routes.get(0);
 
@@ -1179,6 +1195,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
 
     if (buildRouteChannel != null) {
       buildRouteChannel.success(null);
+      buildRouteChannel = null;
     }
   }
 
@@ -1186,7 +1203,13 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public void onDrivingRoutesError(@NonNull Error error) {
     Log.e("DrivingRoutesError", "Error" + error);
     if (searchChannel != null) {
-      searchChannel.error("DrivingRoutesError", error.toString(), error);
+      searchChannel.error("DrivingRoutesError", error.toString(), null);
+      buildRouteChannel = null;
+    } else if (estimationRouteChannel != null) {
+      estimationRouteChannel.error("DrivingRoutesError", error.toString(), null);
+      estimationRouteChannel = null;
+    } else {
+      Log.e("DrivingRoutesError", "Result is null");
     }
   }
 
