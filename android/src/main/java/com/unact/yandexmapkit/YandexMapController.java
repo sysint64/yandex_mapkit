@@ -60,8 +60,7 @@ import io.flutter.plugin.platform.PlatformView;
 
 public class YandexMapController implements PlatformView, MethodChannel.MethodCallHandler,
   RouteListener, SearchListener, com.yandex.mapkit.transport.bicycle.Session.RouteListener,
-  DrivingSession.DrivingRouteListener
-{
+  DrivingSession.DrivingRouteListener {
   static class PointBound {
     final RoutePoint startPoint;
     final RoutePoint endPoint;
@@ -279,9 +278,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     methodChannel.setMethodCallHandler(this);
 
     mapView
-            .getMap()
-            .getLogo()
-            .setAlignment(new Alignment(HorizontalAlignment.RIGHT, VerticalAlignment.TOP));
+      .getMap()
+      .getLogo()
+      .setAlignment(new Alignment(HorizontalAlignment.RIGHT, VerticalAlignment.TOP));
 
     masstransitRouter = TransportFactory.getInstance().createMasstransitRouter();
     pedestrianRouter = TransportFactory.getInstance().createPedestrianRouter();
@@ -554,9 +553,9 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
       RequestPointType type;
 
       if (i == 0 || i == params.size() - 1) {
-        type =  RequestPointType.WAYPOINT;
+        type = RequestPointType.WAYPOINT;
       } else {
-        type =  RequestPointType.VIAPOINT;
+        type = RequestPointType.VIAPOINT;
       }
 
       final Map<String, Object> point = params.get(i);
@@ -617,12 +616,12 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
     final Double bottomRight = (Double) params.get("bottomRight");
 
     mapView
-        .setFocusRect(
-          new ScreenRect(
-            new ScreenPoint(topLeft.floatValue(), topRight.floatValue()),
-            new ScreenPoint(bottomLeft.floatValue(), bottomRight.floatValue())
-          )
-        );
+      .setFocusRect(
+        new ScreenRect(
+          new ScreenPoint(topLeft.floatValue(), topRight.floatValue()),
+          new ScreenPoint(bottomLeft.floatValue(), bottomRight.floatValue())
+        )
+      );
   }
 
   private void search(MethodCall call) {
@@ -810,6 +809,15 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
           );
         }
       }
+    } else {
+      if (estimationRouteChannel != null) {
+        estimationRouteChannel.error("empty_routes", "Couldn't build route", null);
+        estimationRouteChannel = null;
+      } else if (buildRouteChannel != null) {
+        buildRouteChannel.error("empty_routes", "Couldn't build route", null);
+        buildRouteChannel = null;
+      }
+      return;
     }
 
     masstransitSectionInfoList = mergeSectionInfoList(masstransitSectionInfoList);
@@ -907,12 +915,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public void onMasstransitRoutesError(@NonNull Error error) {
     Log.e("MasstransitRoutesError", "Error: " + error);
     if (buildRouteChannel != null) {
-      Log.e("MasstransitRoutesError", "Send error!");
-      buildRouteChannel.error("MasstransitRoutesError", error.toString(), null);
+      buildRouteChannel.error("build_error", error.toString(), null);
       buildRouteChannel = null;
     } else if (estimationRouteChannel != null) {
-      Log.e("MasstransitRoutesError", "Send error!");
-      estimationRouteChannel.error("MasstransitRoutesError", error.toString(), null);
+      estimationRouteChannel.error("build_error", error.toString(), null);
       estimationRouteChannel = null;
     } else {
       Log.e("MasstransitRoutesError", "Result is null");
@@ -934,6 +940,15 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
               routes.get(0).getGeometry(), section.getGeometry()));
         }
       }
+    } else {
+      if (estimationRouteChannel != null) {
+        estimationRouteChannel.error("empty_routes", "Couldn't build route", null);
+        estimationRouteChannel = null;
+      } else if (buildRouteChannel != null) {
+        buildRouteChannel.error("empty_routes", "Couldn't build route", null);
+        buildRouteChannel = null;
+      }
+      return;
     }
 
     if (buildRouteChannel != null) {
@@ -946,10 +961,10 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public void onBicycleRoutesError(@NonNull Error error) {
     Log.e("BicycleRoutesError", "Error" + error);
     if (buildRouteChannel != null) {
-      buildRouteChannel.error("BicycleRoutesError", error.toString(), null);
+      buildRouteChannel.error("build_error", error.toString(), null);
       buildRouteChannel = null;
     } else if (estimationRouteChannel != null) {
-      estimationRouteChannel.error("BicycleRoutesError", error.toString(), null);
+      estimationRouteChannel.error("build_error", error.toString(), null);
       estimationRouteChannel = null;
     } else {
       Log.e("BicycleRoutesError", "Result is null");
@@ -1172,7 +1187,7 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   public void onSearchError(@NonNull Error error) {
     Log.e("SearchError", "Error" + error);
     if (searchChannel != null) {
-      searchChannel.error("SearchError", error.toString(), error);
+      searchChannel.error("search_error", error.toString(), error);
     }
   }
 
@@ -1191,6 +1206,15 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
         polylineMapObject.setStrokeColor(0xFFA06ED9);
         routePolylines.add(polylineMapObject);
       }
+    } else {
+      if (estimationRouteChannel != null) {
+        estimationRouteChannel.error("empty_routes", "Couldn't build route", null);
+        estimationRouteChannel = null;
+      } else if (buildRouteChannel != null) {
+        buildRouteChannel.error("empty_routes", "Couldn't build route", null);
+        buildRouteChannel = null;
+      }
+      return;
     }
 
     if (buildRouteChannel != null) {
@@ -1202,11 +1226,11 @@ public class YandexMapController implements PlatformView, MethodChannel.MethodCa
   @Override
   public void onDrivingRoutesError(@NonNull Error error) {
     Log.e("DrivingRoutesError", "Error" + error);
-    if (searchChannel != null) {
-      searchChannel.error("DrivingRoutesError", error.toString(), null);
+    if (buildRouteChannel != null) {
+      buildRouteChannel.error("build_error", error.toString(), null);
       buildRouteChannel = null;
     } else if (estimationRouteChannel != null) {
-      estimationRouteChannel.error("DrivingRoutesError", error.toString(), null);
+      estimationRouteChannel.error("build_error", error.toString(), null);
       estimationRouteChannel = null;
     } else {
       Log.e("DrivingRoutesError", "Result is null");
